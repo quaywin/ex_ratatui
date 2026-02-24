@@ -293,7 +293,7 @@ defmodule TaskTracker do
     if idx < length(tasks) do
       task = Enum.at(tasks, idx)
       updated = %{task | status: next_status(task.status)}
-      new_tasks = List.replace_at(tasks, idx, updated)
+      new_tasks = Elixir.List.replace_at(tasks, idx, updated)
       update_board(state, new_tasks) |> Map.put(:tick, state.tick + 1)
     else
       state
@@ -324,7 +324,7 @@ defmodule TaskTracker do
     idx = state.task_selected
 
     if idx < length(tasks) and length(tasks) > 0 do
-      new_tasks = List.delete_at(tasks, idx)
+      new_tasks = Elixir.List.delete_at(tasks, idx)
       new_selected = min(idx, max(length(new_tasks) - 1, 0))
       state = update_board(state, new_tasks)
       %{state | task_selected: new_selected, tick: state.tick + 1}
