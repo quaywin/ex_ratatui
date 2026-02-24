@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Put back `Elixir.` prefix from `List` calls in `task_manager.exs` example
+
 ## [0.4.1] - 2026-02-23
 
 ### Fixed
@@ -17,29 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Constraint::Ratio` with denominator zero now returns an error instead of panicking
 - `Gauge` ratio now validates the value is finite, preventing a panic on NaN input
 - `App.mount/1` callback typespec now includes `{:error, reason}` return
-- HexDocs "View Source" links now point to the correct version tag
 - `ExRatatui.run/1` `after` block no longer masks the original exception if terminal restore also fails
-- `ExRatatui.Server` render errors now log the full stacktrace for easier debugging
-- Added missing `@impl true` on fallback `terminate/2` clause in `ExRatatui.Server`
+- Server render errors now log the full stacktrace for easier debugging
+- Added missing `@impl true` on fallback `terminate/2` clause in the server
 - `ExRatatui.Frame` struct defaults to `width: 0, height: 0` instead of `nil` (typespec now matches actual usage)
 - Deduplicated `encode_constraint/1` — `ExRatatui.Layout` is now the single source of truth
 - Fixed flaky `poll_event` tests that failed when terminal events arrived during the test run
-
-### Changed
-
-- Expanded `ExRatatui` moduledoc with quick start, core API overview, and cross-references
 - `Event.Mouse` typespec fields are now non-nullable to match actual NIF output
-- README demo GIF now uses an absolute URL so it renders on Hex.pm
-- README modifiers list now shows all six supported modifiers
-- Documented `:test_mode` option in `ExRatatui.App` for headless testing
+- Fixed `system_monitor.exs` to cache hostname between refreshes with `Map.get_lazy/3`
+- Removed unnecessary `Elixir.` prefix from `List` calls in `task_manager.exs` example
+- Added server tests for `{:stop, state}` from `handle_info/2` and `terminate/2` callback
 
 ### Docs
 
+- HexDocs "View Source" links now point to the correct version tag
+- Expanded `ExRatatui` moduledoc with quick start, core API overview, and cross-references
+- README demo GIF now uses an absolute URL so it renders on Hex.pm
+- README modifiers list now shows all six supported modifiers
+- Documented `:test_mode` option in `ExRatatui.App` for headless testing
 - Clarified `system_monitor.exs` is Linux/Nerves only in README
-- Removed unnecessary `Elixir.` prefix from `List` calls in `task_manager.exs` example
-- Fixed `system_monitor.exs` to cache hostname between refreshes with `Map.get_lazy/3`
-- Pinned CI workflow to `actions/checkout@v4`
-- Added server tests for `{:stop, state}` from `handle_info/2` and `terminate/2` callback
 
 ## [0.4.0] - 2026-02-23
 
