@@ -42,7 +42,7 @@ Add `ex_ratatui` to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ex_ratatui, "~> 0.4"}
+    {:ex_ratatui, "~> 0.5"}
   ]
 end
 ```
