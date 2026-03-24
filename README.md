@@ -35,6 +35,12 @@ Build rich terminal UIs in Elixir with ratatui's layout engine, widget library, 
 | `task_manager.exs` | `mix run examples/task_manager.exs` | Full task manager with tabs, table, scrollbar, line gauge, and more |
 | `task_manager/` | See [README](https://github.com/mcass19/ex_ratatui/tree/main/examples/task_manager) | Supervised Ecto + SQLite CRUD app |
 
+
+## Built with ExRatatui
+
+- **[ash_tui](https://github.com/mcass19/ash_tui)** — Interactive terminal explorer for [Ash](https://ash-hq.org) domains, resources, attributes, actions, and more.
+- **[nerves_ex_ratatui_example](https://github.com/mcass19/nerves_ex_ratatui_example)** — Example [Nerves](https://nerves-project.org) project demonstrating ExRatatui on embedded hardware, with a system monitor and LED control TUI.
+
 ## Installation
 
 Add `ex_ratatui` to your dependencies in `mix.exs`:
