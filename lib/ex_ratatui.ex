@@ -36,7 +36,9 @@ defmodule ExRatatui do
   `ExRatatui.Widgets.Gauge`, `ExRatatui.Widgets.LineGauge`,
   `ExRatatui.Widgets.Tabs`, `ExRatatui.Widgets.Scrollbar`,
   `ExRatatui.Widgets.Checkbox`, `ExRatatui.Widgets.TextInput`,
-  and `ExRatatui.Widgets.Clear`.
+  `ExRatatui.Widgets.Clear`, `ExRatatui.Widgets.Markdown`,
+  `ExRatatui.Widgets.Textarea`, `ExRatatui.Widgets.Throbber`,
+  `ExRatatui.Widgets.Popup`, and `ExRatatui.Widgets.WidgetList`.
 
   ## Testing
 

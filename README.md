@@ -13,7 +13,7 @@ Build rich terminal UIs in Elixir with ratatui's layout engine, widget library, 
 
 ## Features
 
-- 11 built-in widgets (for now!): Paragraph, Block, List, Table, Gauge, LineGauge, Tabs, Scrollbar, Checkbox, TextInput, Clear
+- 16 built-in widgets (and counting!): Paragraph, Block, List, Table, Gauge, LineGauge, Tabs, Scrollbar, Checkbox, TextInput, Clear, Markdown, Textarea, Throbber, Popup, WidgetList
 - Constraint-based layout engine (percentage, length, min, max, ratio)
 - Non-blocking keyboard, mouse, and resize event polling
 - **OTP-supervised TUI apps** via `ExRatatui.App` behaviour with LiveView-inspired callbacks
@@ -33,6 +33,7 @@ Build rich terminal UIs in Elixir with ratatui's layout engine, widget library, 
 | `system_monitor.exs` | `mix run examples/system_monitor.exs` | Linux system dashboard — CPU, memory, disk, network, BEAM stats (Linux/Nerves only) |
 | `widget_showcase.exs` | `mix run examples/widget_showcase.exs` | Interactive showcase: tabs, progress bars, checkboxes, text input, scrollable logs |
 | `task_manager.exs` | `mix run examples/task_manager.exs` | Full task manager with tabs, table, scrollbar, line gauge, and more |
+| `chat_interface.exs` | `mix run examples/chat_interface.exs` | AI chat interface — markdown, textarea, throbber, popup, slash commands |
 | `task_manager/` | See [README](https://github.com/mcass19/ex_ratatui/tree/main/examples/task_manager) | Supervised Ecto + SQLite CRUD app |
 
 
@@ -339,6 +340,90 @@ Resets all cells in its area to empty (space) characters. Useful for rendering o
 
 ```elixir
 %Clear{}
+```
+
+### Markdown
+
+Renders markdown with syntax-highlighted code blocks. Powered by `tui-markdown` (pulldown-cmark + syntect). Supports headings, bold, italic, inline code, fenced code blocks, bullet lists, links, and horizontal rules.
+
+```elixir
+%Markdown{
+  content: "# Hello\n\nSome **bold** text and `inline code`.\n\n```elixir\nIO.puts(\"hi\")\n```",
+  wrap: true,
+  block: %Block{title: "Response", borders: [:all]}
+}
+```
+
+### Textarea
+
+Multiline text editor with undo/redo, cursor movement, and Emacs-style shortcuts. This is a **stateful** widget — state lives in Rust via ResourceArc.
+
+```elixir
+# Create state (once, e.g. in mount/1)
+state = ExRatatui.textarea_new()
+
+# Forward key events (with modifier support)
+ExRatatui.textarea_handle_key(state, "h", [])
+ExRatatui.textarea_handle_key(state, "enter", [])
+ExRatatui.textarea_handle_key(state, "w", ["ctrl"])  # delete word backward
+
+# Read value
+ExRatatui.textarea_get_value(state)  #=> "h\n"
+
+# Render
+%Textarea{
+  state: state,
+  placeholder: "Type your message...",
+  placeholder_style: %Style{fg: :dark_gray},
+  block: %Block{title: "Message", borders: [:all], border_type: :rounded}
+}
+```
+
+### Throbber
+
+Loading spinner that animates through symbol sets. The caller controls animation by incrementing `:step` on each tick.
+
+```elixir
+%Throbber{
+  label: "Loading...",
+  step: state.tick,
+  throbber_set: :braille,
+  throbber_style: %Style{fg: :cyan},
+  block: %Block{title: "Status", borders: [:all]}
+}
+```
+
+Available sets: `:braille`, `:dots`, `:ascii`, `:vertical_block`, `:horizontal_block`, `:arrow`, `:clock`, `:box_drawing`, `:quadrant_block`, `:white_square`, `:white_circle`, `:black_circle`.
+
+### Popup
+
+Centered modal overlay. Renders any widget centered over the parent area, clearing the background underneath. Useful for dialogs, confirmations, and command palettes.
+
+```elixir
+%Popup{
+  content: %Paragraph{text: "Are you sure?"},
+  block: %Block{title: "Confirm", borders: [:all], border_type: :rounded},
+  percent_width: 50,
+  percent_height: 30
+}
+```
+
+### WidgetList
+
+Vertical list of heterogeneous widgets with optional selection and scrolling. Each item is a `{widget, height}` tuple. Ideal for chat message histories where items have different heights.
+
+```elixir
+%WidgetList{
+  items: [
+    {%Paragraph{text: "User: Hello!"}, 1},
+    {%Markdown{content: "**Bot:** Hi there!\n\nHow can I help?"}, 4},
+    {%Paragraph{text: "User: What is Elixir?"}, 1}
+  ],
+  selected: 1,
+  highlight_style: %Style{fg: :yellow},
+  scroll_offset: 0,
+  block: %Block{title: "Chat", borders: [:all]}
+}
 ```
 
 ## Layout

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ExRatatui.Widgets.Markdown` — markdown rendering widget with syntax-highlighted code blocks, powered by `tui-markdown` (pulldown-cmark + syntect)
+- `ExRatatui.Widgets.Textarea` — multiline text editor with undo/redo, cursor movement, and Emacs-style shortcuts. Second **stateful** widget — state lives in Rust via ResourceArc
+- `ExRatatui.Widgets.Throbber` — loading spinner widget with 12 animation sets (braille, dots, ascii, arrow, clock, and more)
+- `ExRatatui.Widgets.Popup` — centered modal overlay widget for dialogs, confirmations, and command palettes
+- `ExRatatui.Widgets.WidgetList` — vertical list of heterogeneous widgets with selection and scrolling, ideal for chat message histories
+- `ExRatatui.Widgets.SlashCommands` — slash command parsing, matching, and autocomplete popup rendering
+- Textarea NIF functions: `textarea_new/0`, `textarea_handle_key/3`, `textarea_get_value/1`, `textarea_set_value/2`, `textarea_cursor/1`, `textarea_line_count/1`
+- Example: `chat_interface.exs` — AI chat interface demonstrating Markdown, Textarea, Throbber, Popup, WidgetList, and SlashCommands
+
+### Fixed
+
+- Replaced deprecated `Padding::zero()` with `Padding::ZERO` in Rust widget renderers
+- Wired up unused `style` field in `WidgetList` render function (was `#[allow(dead_code)]`)
+- Fixed flaky Rust throbber step test — `calc_step(0)` uses random index, now tests with deterministic non-zero steps
+- Throbber animation set test now covers all 12 sets (was 7)
+
 ## [0.5.0] - 2026-03-22
 
 ### Added

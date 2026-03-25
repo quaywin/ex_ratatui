@@ -101,7 +101,14 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Widgets.Scrollbar,
           ExRatatui.Widgets.Checkbox,
           ExRatatui.Widgets.TextInput,
-          ExRatatui.Widgets.Clear
+          ExRatatui.Widgets.Clear,
+          ExRatatui.Widgets.Markdown,
+          ExRatatui.Widgets.Textarea,
+          ExRatatui.Widgets.Throbber,
+          ExRatatui.Widgets.Popup,
+          ExRatatui.Widgets.WidgetList,
+          ExRatatui.Widgets.SlashCommands,
+          ExRatatui.Widgets.SlashCommands.Command
         ],
         Events: [
           ExRatatui.Event,
