@@ -140,7 +140,7 @@ mod tests {
                 border_type: ratatui::widgets::BorderType::Rounded,
                 border_style: Style::default(),
                 style: Style::default(),
-                padding: ratatui::widgets::Padding::zero(),
+                padding: ratatui::widgets::Padding::ZERO,
             }),
         };
 

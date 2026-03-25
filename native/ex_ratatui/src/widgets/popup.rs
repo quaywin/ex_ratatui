@@ -77,7 +77,7 @@ mod tests {
             border_type: BorderType::Rounded,
             border_style: Style::default(),
             style: Style::default(),
-            padding: Padding::zero(),
+            padding: Padding::ZERO,
         }
     }
 
