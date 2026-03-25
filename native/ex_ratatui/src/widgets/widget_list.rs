@@ -16,7 +16,6 @@ pub struct WidgetListData {
     pub highlight_style: Style,
     pub scroll_offset: usize,
     pub block: Option<BlockData>,
-    #[allow(dead_code)]
     pub style: Style,
 }
 
@@ -30,6 +29,10 @@ pub fn render(frame: &mut Frame, data: &WidgetListData, area: Rect) {
     } else {
         area
     };
+
+    // Apply base style to the inner area
+    let style_block = ratatui::widgets::Block::default().style(data.style);
+    frame.render_widget(style_block, inner_area);
 
     // Render items vertically starting from scroll_offset
     let mut y = inner_area.y;

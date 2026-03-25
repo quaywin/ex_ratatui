@@ -1127,7 +1127,20 @@ defmodule ExRatatui.WidgetsTest do
     test "throbber with different animation sets", %{terminal: terminal} do
       rect = %Rect{x: 0, y: 0, width: 30, height: 1}
 
-      for set <- [:braille, :dots, :ascii, :vertical_block, :horizontal_block, :arrow, :clock] do
+      for set <- [
+            :braille,
+            :dots,
+            :ascii,
+            :vertical_block,
+            :horizontal_block,
+            :arrow,
+            :clock,
+            :box_drawing,
+            :quadrant_block,
+            :white_square,
+            :white_circle,
+            :black_circle
+          ] do
         throbber = %Throbber{label: "Test", step: 0, throbber_set: set}
         assert :ok = ExRatatui.draw(terminal, [{throbber, rect}])
       end

@@ -104,14 +104,7 @@ mod tests {
         let backend = TestBackend::new(30, 1);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        let data0 = make_data(None, 0, "braille");
-        terminal
-            .draw(|frame| {
-                render(frame, &data0, Rect::new(0, 0, 30, 1));
-            })
-            .unwrap();
-        let line0 = buffer_line(&terminal, 0, 30);
-
+        // Use non-zero steps to avoid calc_step(0) which picks a random index
         let data1 = make_data(None, 1, "braille");
         terminal
             .draw(|frame| {
@@ -120,8 +113,16 @@ mod tests {
             .unwrap();
         let line1 = buffer_line(&terminal, 0, 30);
 
-        // Adjacent steps should produce different symbols
-        assert_ne!(line0, line1, "Step 0 and step 1 should render differently");
+        let data3 = make_data(None, 3, "braille");
+        terminal
+            .draw(|frame| {
+                render(frame, &data3, Rect::new(0, 0, 30, 1));
+            })
+            .unwrap();
+        let line3 = buffer_line(&terminal, 0, 30);
+
+        // Different non-zero steps should produce different symbols
+        assert_ne!(line1, line3, "Step 1 and step 3 should render differently");
     }
 
     #[test]
