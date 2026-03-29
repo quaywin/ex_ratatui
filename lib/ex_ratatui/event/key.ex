@@ -43,11 +43,13 @@ defmodule ExRatatui.Event.Key do
 
   ## Examples
 
-      # Match a simple keypress
-      %Event.Key{code: "q", kind: "press"}
+      iex> %ExRatatui.Event.Key{code: "q", kind: "press"}
+      %ExRatatui.Event.Key{code: "q", kind: "press", modifiers: []}
 
-      # Match Ctrl+C
-      %Event.Key{code: "c", kind: "press", modifiers: ["ctrl"]}
+      iex> %ExRatatui.Event.Key{code: "c", kind: "press", modifiers: ["ctrl"]}
+      %ExRatatui.Event.Key{code: "c", kind: "press", modifiers: ["ctrl"]}
+
+  Pattern matching on events:
 
       # Match any arrow key
       %Event.Key{code: code, kind: "press"} when code in ~w(up down left right)

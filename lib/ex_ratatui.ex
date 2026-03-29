@@ -131,11 +131,17 @@ defmodule ExRatatui do
   @doc """
   Draws a list of `{widget, rect}` tuples to the terminal in a single frame.
 
-  Returns `:ok` on success or `{:error, reason}` on failure.
+  Each tuple pairs a widget struct (e.g. `%Paragraph{}`, `%Table{}`) with a
+  `%Rect{}` that defines where to render it. Returns `:ok` on success or
+  `{:error, reason}` on failure.
 
-      ExRatatui.draw(terminal, [
-        {%ExRatatui.Widgets.Paragraph{text: "Hello!"}, rect}
-      ])
+  ## Examples
+
+      iex> terminal = ExRatatui.init_test_terminal(40, 10)
+      iex> paragraph = %ExRatatui.Widgets.Paragraph{text: "Hello!"}
+      iex> rect = %ExRatatui.Layout.Rect{x: 0, y: 0, width: 40, height: 10}
+      iex> ExRatatui.draw(terminal, [{paragraph, rect}])
+      :ok
   """
   @spec draw(terminal_ref(), [{widget(), Rect.t()}]) :: :ok | {:error, term()}
   def draw(terminal_ref, widgets) when is_list(widgets) do
@@ -186,6 +192,7 @@ defmodule ExRatatui do
   @doc """
   Initializes a headless test terminal with the given dimensions.
 
+  Takes `width` (columns) and `height` (rows) for the virtual terminal.
   Uses ratatui's TestBackend — no real terminal needed. Useful for testing
   rendering output without a TTY. Returns a terminal reference.
 
@@ -213,6 +220,15 @@ defmodule ExRatatui do
 
   Each line is trimmed of trailing whitespace and joined with newlines.
   Only works with a test terminal reference from `init_test_terminal/2`.
+
+  ## Examples
+
+      iex> terminal = ExRatatui.init_test_terminal(20, 3)
+      iex> paragraph = %ExRatatui.Widgets.Paragraph{text: "Hi there"}
+      iex> rect = %ExRatatui.Layout.Rect{x: 0, y: 0, width: 20, height: 3}
+      iex> ExRatatui.draw(terminal, [{paragraph, rect}])
+      iex> ExRatatui.get_buffer_content(terminal) =~ "Hi there"
+      true
   """
   @spec get_buffer_content(terminal_ref()) :: String.t() | {:error, term()}
   def get_buffer_content(terminal_ref) do
@@ -322,7 +338,9 @@ defmodule ExRatatui do
   @doc """
   Forwards a key event with modifiers to the Textarea state.
 
-  The textarea supports Emacs-style shortcuts (Ctrl+Z undo, Ctrl+Y redo, etc.).
+  `modifiers` is a list of active modifier strings (e.g. `["ctrl"]`),
+  defaults to `[]`. The textarea supports Emacs-style shortcuts
+  (Ctrl+Z undo, Ctrl+Y redo, etc.).
 
   ## Examples
 

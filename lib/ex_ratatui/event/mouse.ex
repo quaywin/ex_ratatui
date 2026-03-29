@@ -15,6 +15,11 @@ defmodule ExRatatui.Event.Mouse do
 
   ## Examples
 
+      iex> %ExRatatui.Event.Mouse{kind: "down", button: "left", x: 5, y: 10}
+      %ExRatatui.Event.Mouse{kind: "down", button: "left", x: 5, y: 10, modifiers: []}
+
+  Pattern matching on events:
+
       # Match a left click
       %Event.Mouse{kind: "down", button: "left", x: x, y: y}
 

@@ -71,16 +71,48 @@ defmodule ExRatatui.App do
 
   @type state :: term()
 
+  @doc """
+  Called once on startup with the options passed to `start_link/1`.
+
+  Return `{:ok, initial_state}` to proceed or `{:error, reason}` to abort.
+  """
   @callback mount(opts :: keyword()) :: {:ok, state()} | {:error, reason :: term()}
+
+  @doc """
+  Called after every state change to produce the UI.
+
+  Receives the current state and a `%ExRatatui.Frame{}` with the terminal
+  dimensions. Return a list of `{widget, rect}` tuples to render.
+  """
   @callback render(state(), ExRatatui.Frame.t()) :: [
               {ExRatatui.widget(), ExRatatui.Layout.Rect.t()}
             ]
+
+  @doc """
+  Called when a terminal event (key, mouse, or resize) arrives.
+
+  Return `{:noreply, new_state}` to continue or `{:stop, state}` to
+  shut down the application.
+  """
   @callback handle_event(
               ExRatatui.Event.Key.t() | ExRatatui.Event.Mouse.t() | ExRatatui.Event.Resize.t(),
               state()
             ) ::
               {:noreply, state()} | {:stop, state()}
+
+  @doc """
+  Called for non-terminal messages (e.g. PubSub broadcasts, `send/2`).
+
+  Optional — the default implementation returns `{:noreply, state}`.
+  """
   @callback handle_info(msg :: term(), state()) :: {:noreply, state()} | {:stop, state()}
+
+  @doc """
+  Called when the TUI is shutting down.
+
+  Receives the exit reason and the final state. Optional — the default
+  is a no-op. Use this to call `System.stop(0)` in standalone apps.
+  """
   @callback terminate(reason :: term(), state()) :: term()
 
   @optional_callbacks [handle_info: 2, terminate: 2]

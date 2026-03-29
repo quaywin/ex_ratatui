@@ -102,6 +102,16 @@ defmodule ExRatatui.Widgets.SlashCommands do
     * `:style` — style for non-selected items
     * `:percent_width` — popup width as percentage (default `50`)
     * `:percent_height` — popup height as percentage (default `40`)
+
+  ## Examples
+
+      iex> alias ExRatatui.Widgets.SlashCommands
+      iex> alias ExRatatui.Widgets.SlashCommands.Command
+      iex> commands = [%Command{name: "help", description: "Show help"}]
+      iex> area = %ExRatatui.Layout.Rect{x: 0, y: 0, width: 80, height: 24}
+      iex> [{%ExRatatui.Widgets.Popup{}, %ExRatatui.Layout.Rect{}}] = SlashCommands.render_autocomplete(commands, area: area)
+      iex> :ok
+      :ok
   """
   @spec render_autocomplete([Command.t()], keyword()) :: [
           {ExRatatui.widget(), ExRatatui.Layout.Rect.t()}

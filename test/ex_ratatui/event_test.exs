@@ -1,6 +1,10 @@
 defmodule ExRatatui.EventTest do
   use ExUnit.Case, async: true
 
+  doctest ExRatatui.Event.Key
+  doctest ExRatatui.Event.Mouse
+  doctest ExRatatui.Event.Resize
+
   describe "poll_event/1" do
     test "returns nil (timeout), an event, or {:error, _} (no TTY)" do
       result = ExRatatui.poll_event(10)
