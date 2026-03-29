@@ -81,5 +81,10 @@ defmodule ExRatatui.LayoutTest do
 
       assert rect == area
     end
+
+    test "returns error for invalid constraints" do
+      area = %Rect{x: 0, y: 0, width: 80, height: 24}
+      assert {:error, _reason} = Layout.split(area, :vertical, [{:ratio, 1, 0}])
+    end
   end
 end

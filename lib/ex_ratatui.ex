@@ -46,6 +46,9 @@ defmodule ExRatatui do
   rendering verification in CI — no TTY required.
   """
 
+  require Logger
+
+  alias ExRatatui.Event
   alias ExRatatui.Native
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
@@ -101,23 +104,28 @@ defmodule ExRatatui do
   """
   @spec run((terminal_ref() -> term())) :: term() | {:error, term()}
   def run(fun) when is_function(fun, 1) do
-    case Native.init_terminal() do
-      {:error, reason} ->
-        {:error, reason}
+    Native.init_terminal() |> do_run(fun)
+  end
 
-      terminal_ref ->
-        try do
-          fun.(terminal_ref)
-        after
-          try do
-            Native.restore_terminal(terminal_ref)
-          rescue
-            e ->
-              require Logger
-              Logger.warning("Failed to restore terminal: #{Exception.message(e)}")
-          end
-        end
+  @doc false
+  def do_run({:error, reason}, _fun), do: {:error, reason}
+  def do_run(terminal_ref, fun), do: execute_with_terminal(terminal_ref, fun)
+
+  @doc false
+  def execute_with_terminal(terminal_ref, fun) do
+    try do
+      fun.(terminal_ref)
+    after
+      safe_restore_terminal(terminal_ref)
     end
+  end
+
+  @doc false
+  def safe_restore_terminal(terminal_ref) do
+    Native.restore_terminal(terminal_ref)
+  rescue
+    e ->
+      Logger.warning("Failed to restore terminal: #{Exception.message(e)}")
   end
 
   @doc """
@@ -144,25 +152,22 @@ defmodule ExRatatui do
   @spec poll_event(non_neg_integer()) ::
           ExRatatui.Event.t() | nil | {:error, term()}
   def poll_event(timeout_ms \\ 250) do
-    alias ExRatatui.Event
-
-    case Native.poll_event(timeout_ms) do
-      nil ->
-        nil
-
-      {:key, code, modifiers, kind} ->
-        %Event.Key{code: code, modifiers: modifiers, kind: kind}
-
-      {:mouse, kind, button, x, y, modifiers} ->
-        %Event.Mouse{kind: kind, button: button, x: x, y: y, modifiers: modifiers}
-
-      {:resize, width, height} ->
-        %Event.Resize{width: width, height: height}
-
-      {:error, _} = err ->
-        err
-    end
+    timeout_ms |> Native.poll_event() |> decode_event()
   end
+
+  @doc false
+  def decode_event(nil), do: nil
+
+  def decode_event({:key, code, modifiers, kind}),
+    do: %Event.Key{code: code, modifiers: modifiers, kind: kind}
+
+  def decode_event({:mouse, kind, button, x, y, modifiers}),
+    do: %Event.Mouse{kind: kind, button: button, x: x, y: y, modifiers: modifiers}
+
+  def decode_event({:resize, width, height}),
+    do: %Event.Resize{width: width, height: height}
+
+  def decode_event({:error, _} = err), do: err
 
   @doc """
   Returns the current terminal size as `{width, height}`.
@@ -171,11 +176,12 @@ defmodule ExRatatui do
   """
   @spec terminal_size() :: {non_neg_integer(), non_neg_integer()} | {:error, term()}
   def terminal_size do
-    case Native.terminal_size() do
-      {w, h} when is_integer(w) and is_integer(h) -> {w, h}
-      {:error, _} = err -> err
-    end
+    Native.terminal_size() |> validate_terminal_size()
   end
+
+  @doc false
+  def validate_terminal_size({w, h}) when is_integer(w) and is_integer(h), do: {w, h}
+  def validate_terminal_size({:error, _} = err), do: err
 
   @doc """
   Initializes a headless test terminal with the given dimensions.

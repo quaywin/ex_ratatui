@@ -73,5 +73,35 @@ defmodule ExRatatui.RenderingTest do
     test "accepts empty widget list", %{terminal: terminal} do
       assert :ok = ExRatatui.draw(terminal, [])
     end
+
+    test "accepts paragraph with indexed color", %{terminal: terminal} do
+      paragraph = %Paragraph{
+        text: "Indexed color",
+        style: %Style{fg: {:indexed, 42}}
+      }
+
+      rect = %Rect{x: 0, y: 0, width: 40, height: 5}
+
+      assert :ok = ExRatatui.draw(terminal, [{paragraph, rect}])
+      assert ExRatatui.get_buffer_content(terminal) =~ "Indexed color"
+    end
+
+    test "accepts textarea with line_number_style", %{terminal: terminal} do
+      alias ExRatatui.Widgets.Textarea
+
+      state = ExRatatui.textarea_new()
+      ExRatatui.textarea_set_value(state, "line 1\nline 2")
+
+      textarea = %Textarea{
+        state: state,
+        style: %Style{fg: :white},
+        cursor_style: %Style{fg: :black, bg: :white},
+        line_number_style: %Style{fg: :dark_gray}
+      }
+
+      rect = %Rect{x: 0, y: 0, width: 40, height: 10}
+
+      assert :ok = ExRatatui.draw(terminal, [{textarea, rect}])
+    end
   end
 end

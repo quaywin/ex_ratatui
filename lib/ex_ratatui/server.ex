@@ -32,63 +32,47 @@ defmodule ExRatatui.Server do
 
   @impl true
   def init(opts) do
+    Process.flag(:trap_exit, true)
+    test_mode = Keyword.get(opts, :test_mode)
+    init_terminal(test_mode) |> continue_init(opts)
+  end
+
+  @doc false
+  def continue_init({:error, reason}, _opts), do: {:stop, {:terminal_init_failed, reason}}
+
+  def continue_init(terminal_ref, opts) do
     mod = Keyword.fetch!(opts, :mod)
     poll_interval = Keyword.get(opts, :poll_interval, 16)
     test_mode = Keyword.get(opts, :test_mode)
 
-    Process.flag(:trap_exit, true)
+    case mod.mount(opts) do
+      {:ok, user_state} ->
+        state = %__MODULE__{
+          mod: mod,
+          user_state: user_state,
+          poll_interval: poll_interval,
+          test_mode: test_mode,
+          terminal_ref: terminal_ref,
+          terminal_initialized: true
+        }
 
-    case init_terminal(test_mode) do
+        state = do_render(state)
+        send(self(), :poll)
+
+        {:ok, state}
+
       {:error, reason} ->
-        {:stop, {:terminal_init_failed, reason}}
-
-      terminal_ref ->
-        case mod.mount(opts) do
-          {:ok, user_state} ->
-            state = %__MODULE__{
-              mod: mod,
-              user_state: user_state,
-              poll_interval: poll_interval,
-              test_mode: test_mode,
-              terminal_ref: terminal_ref,
-              terminal_initialized: true
-            }
-
-            state = do_render(state)
-            send(self(), :poll)
-
-            {:ok, state}
-
-          {:error, reason} ->
-            restore_terminal(terminal_ref)
-            {:stop, reason}
-        end
+        restore_terminal(terminal_ref)
+        {:stop, reason}
     end
   end
 
   @impl true
   def handle_info(:poll, state) do
-    result =
-      case ExRatatui.poll_event(state.poll_interval) do
-        nil ->
-          {:continue, state, false}
-
-        {:error, _} ->
-          {:continue, state, false}
-
-        event ->
-          dispatch_event(state, event)
-      end
-
-    case result do
-      {:stop, state} ->
-        {:stop, :normal, state}
-
-      {:continue, state, render?} ->
-        state = if render?, do: do_render(state), else: state
-        send(self(), :poll)
-        {:noreply, state}
-    end
+    state.poll_interval
+    |> ExRatatui.poll_event()
+    |> handle_poll_result(state)
+    |> process_poll_result()
   end
 
   @impl true
@@ -114,6 +98,44 @@ defmodule ExRatatui.Server do
   @impl true
   def terminate(_reason, _state), do: :ok
 
+  ## Extracted logic (@doc false, public for testability)
+
+  @doc false
+  def handle_poll_result(nil, state), do: {:continue, state, false}
+  def handle_poll_result({:error, _}, state), do: {:continue, state, false}
+  def handle_poll_result(event, state), do: dispatch_event(state, event)
+
+  @doc false
+  def dispatch_event(state, event) do
+    case state.mod.handle_event(event, state.user_state) do
+      {:noreply, new_user_state} ->
+        {:continue, %{state | user_state: new_user_state}, true}
+
+      {:stop, new_user_state} ->
+        {:stop, %{state | user_state: new_user_state}}
+    end
+  end
+
+  @doc false
+  def process_poll_result({:stop, state}), do: {:stop, :normal, state}
+
+  def process_poll_result({:continue, state, render?}) do
+    state = if render?, do: do_render(state), else: state
+    send(self(), :poll)
+    {:noreply, state}
+  end
+
+  @doc false
+  def resolve_terminal_size({w, h}), do: {w, h}
+
+  def resolve_terminal_size(nil) do
+    ExRatatui.terminal_size() |> normalize_size_result()
+  end
+
+  @doc false
+  def normalize_size_result({w, h}) when is_integer(w) and is_integer(h), do: {w, h}
+  def normalize_size_result({:error, _}), do: {80, 24}
+
   ## Private helpers
 
   defp init_terminal(nil), do: Native.init_terminal()
@@ -127,28 +149,8 @@ defmodule ExRatatui.Server do
       :ok
   end
 
-  defp dispatch_event(state, event) do
-    case state.mod.handle_event(event, state.user_state) do
-      {:noreply, new_user_state} ->
-        {:continue, %{state | user_state: new_user_state}, true}
-
-      {:stop, new_user_state} ->
-        {:stop, %{state | user_state: new_user_state}}
-    end
-  end
-
   defp do_render(state) do
-    {w, h} =
-      case state.test_mode do
-        {w, h} ->
-          {w, h}
-
-        nil ->
-          case ExRatatui.terminal_size() do
-            {w, h} when is_integer(w) and is_integer(h) -> {w, h}
-            {:error, _} -> {80, 24}
-          end
-      end
+    {w, h} = resolve_terminal_size(state.test_mode)
 
     frame = %Frame{width: w, height: h}
 

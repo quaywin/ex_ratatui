@@ -20,6 +20,9 @@ defmodule ExRatatui.MixProject do
       homepage_url: @source_url,
       source_url: @source_url,
       docs: docs(),
+      test_coverage: [
+        ignore_modules: [ExRatatui.Native]
+      ],
       dialyzer: [
         plt_local_path: "plts",
         plt_core_path: "plts/core",

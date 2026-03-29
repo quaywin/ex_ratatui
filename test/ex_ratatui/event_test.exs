@@ -7,6 +7,11 @@ defmodule ExRatatui.EventTest do
       assert valid_poll_result?(result)
     end
 
+    test "accepts default timeout (no argument)" do
+      result = ExRatatui.poll_event()
+      assert valid_poll_result?(result)
+    end
+
     test "does not block the BEAM (runs on dirty scheduler)" do
       parent = self()
 

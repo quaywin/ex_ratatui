@@ -74,4 +74,86 @@ defmodule ExRatatuiTest do
     assert mouse.modifiers == []
     assert mouse.x == nil
   end
+
+  describe "decode_event/1" do
+    test "decodes nil (timeout)" do
+      assert ExRatatui.decode_event(nil) == nil
+    end
+
+    test "decodes key event" do
+      assert %ExRatatui.Event.Key{code: "q", modifiers: [], kind: "press"} =
+               ExRatatui.decode_event({:key, "q", [], "press"})
+    end
+
+    test "decodes mouse event" do
+      assert %ExRatatui.Event.Mouse{kind: "down", button: "left", x: 10, y: 20, modifiers: []} =
+               ExRatatui.decode_event({:mouse, "down", "left", 10, 20, []})
+    end
+
+    test "decodes resize event" do
+      assert %ExRatatui.Event.Resize{width: 80, height: 24} =
+               ExRatatui.decode_event({:resize, 80, 24})
+    end
+
+    test "passes through errors" do
+      assert {:error, "test"} = ExRatatui.decode_event({:error, "test"})
+    end
+  end
+
+  describe "validate_terminal_size/1" do
+    test "passes through integer dimensions" do
+      assert {80, 24} = ExRatatui.validate_terminal_size({80, 24})
+    end
+
+    test "passes through errors" do
+      assert {:error, "no tty"} = ExRatatui.validate_terminal_size({:error, "no tty"})
+    end
+  end
+
+  describe "do_run/2" do
+    test "returns error when given error tuple" do
+      assert {:error, "no tty"} = ExRatatui.do_run({:error, "no tty"}, fn _t -> :ok end)
+    end
+
+    test "executes function with terminal ref" do
+      terminal = ExRatatui.init_test_terminal(40, 10)
+
+      result =
+        ExRatatui.do_run(terminal, fn t ->
+          assert is_reference(t)
+          :executed
+        end)
+
+      assert result == :executed
+    end
+  end
+
+  describe "execute_with_terminal/2" do
+    test "runs function and restores terminal" do
+      terminal = ExRatatui.init_test_terminal(40, 10)
+      result = ExRatatui.execute_with_terminal(terminal, fn _t -> :done end)
+      assert result == :done
+    end
+
+    test "restores terminal even when function raises" do
+      terminal = ExRatatui.init_test_terminal(40, 10)
+
+      assert_raise RuntimeError, "boom", fn ->
+        ExRatatui.execute_with_terminal(terminal, fn _t -> raise "boom" end)
+      end
+    end
+  end
+
+  describe "safe_restore_terminal/1" do
+    test "restores a valid terminal" do
+      terminal = ExRatatui.init_test_terminal(40, 10)
+      assert :ok = ExRatatui.safe_restore_terminal(terminal)
+    end
+
+    @tag capture_log: true
+    test "logs warning when restore fails" do
+      # make_ref() is not a valid NIF resource — Native.restore_terminal raises
+      ExRatatui.safe_restore_terminal(make_ref())
+    end
+  end
 end

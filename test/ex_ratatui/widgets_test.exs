@@ -910,6 +910,13 @@ defmodule ExRatatui.WidgetsTest do
       assert ExRatatui.textarea_get_value(state) == ""
     end
 
+    test "handle_key with default modifiers (2-arity)" do
+      state = ExRatatui.textarea_new()
+      ExRatatui.textarea_handle_key(state, "a")
+      ExRatatui.textarea_handle_key(state, "b")
+      assert ExRatatui.textarea_get_value(state) == "ab"
+    end
+
     test "typing characters builds up value" do
       state = ExRatatui.textarea_new()
       ExRatatui.textarea_handle_key(state, "a", [])
