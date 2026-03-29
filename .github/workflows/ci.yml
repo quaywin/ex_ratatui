@@ -76,4 +76,8 @@ jobs:
         if: ${{ ! matrix.lint }}
         run: cargo test --manifest-path native/ex_ratatui/Cargo.toml
 
+      - run: mix test --cover
+        if: ${{ matrix.lint }}
+
       - run: mix test
+        if: ${{ ! matrix.lint }}

@@ -21,6 +21,7 @@ defmodule ExRatatui.MixProject do
       source_url: @source_url,
       docs: docs(),
       test_coverage: [
+        summary: [threshold: 100],
         ignore_modules: [ExRatatui.Native]
       ],
       dialyzer: [
