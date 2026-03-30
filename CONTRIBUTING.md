@@ -37,9 +37,16 @@ from source instead of downloading a precompiled binary.
 # Elixir tests (includes doctests)
 mix test
 
+# Elixir tests with coverage report
+mix test --cover
+
 # Rust tests
 cargo test --manifest-path native/ex_ratatui/Cargo.toml
 ```
+
+> **Note:** CI enforces **100% test coverage** on the Elixir side (NIF modules are
+> excluded). If you add new public functions or branches, make sure to add
+> corresponding tests. Run `mix test --cover` locally to check before pushing.
 
 ## Pull Requests
 

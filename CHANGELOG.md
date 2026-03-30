@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CI enforces 100% Elixir test coverage threshold (NIF modules excluded)
+- Missing doctests for `ExRatatui`, `Event`, `Event.Key`, `Event.Mouse`, `Event.Resize`, and `SlashCommands`
+- Callback documentation for all `ExRatatui.App` callbacks
+
+### Docs
+
+- Expanded moduledoc prose for `ExRatatui`, `Event`, and event struct modules
+- Added coverage requirement note to CONTRIBUTING.md
+
+### Tests
+
+- Bumped Elixir test coverage to 100% — added server, rendering, layout, event, and widget tests
+
 ## [0.5.1] - 2026-03-25
 
 ### Added
