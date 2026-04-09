@@ -100,7 +100,33 @@ ssh nerves.local -s Elixir.MyApp.TUI
 
 The subsystem name is the full Elixir module name as a charlist (because that's what SSH expects), so two different app modules configured into the same daemon get distinct subsystem names and don't collide.
 
-`subsystem/1` bakes a `subsystem: true` flag into its init args so the channel handler knows it was dispatched via OTP's `:subsystems` path. That matters because OTP `:ssh` consumes the `{:subsystem, ...}` channel request _internally_ when it matches the name — `handle_ssh_msg/2` never sees it. The only lifecycle message the handler receives is `{:ssh_channel_up, ...}`, and it uses that as its cue to synthesize a default 80x24 session and start the TUI server immediately. Any subsequent `window_change` from the client's terminal emulator resizes the session through the existing handler, so the first couple of frames may render at 80x24 before snapping to the client's real dimensions.
+`subsystem/1` bakes a `subsystem: true` flag into its init args so the channel handler knows it was dispatched via OTP's `:subsystems` path. That matters because OTP `:ssh` consumes the `{:subsystem, ...}` channel request _internally_ when it matches the name — `handle_ssh_msg/2` never sees it. The only lifecycle message the handler receives is `{:ssh_channel_up, ...}`, and it uses that as its cue to synthesize a default 80x24 session and start the TUI server immediately.
+
+Learning the client's real terminal dimensions in subsystem mode is trickier than it looks. The obvious answer — "read the dimensions off `pty_req`" — doesn't work on `nerves_ssh` (or any OTP `:ssh.daemon` that configures a default CLI handler alongside the subsystems list). When the client connects with `ssh -t -s <name>`, OTP fires `pty_req` _before_ the subsystem dispatch matches, and `:ssh_connection.handle_cli_msg/3` sees an unbound channel user pid, which means it hands the pty_req to the daemon's default CLI handler (IEx on Nerves, for example). Moments later the `{:subsystem, ...}` request arrives, OTP rebinds the channel's user pid to us, and the original CLI handler is silently orphaned — pty_req is gone and there is no OTP message to recover it from.
+
+To sidestep all of that, the handler emits a **Cursor Position Report roundtrip** immediately after starting the server:
+
+```text
+ESC[s               → save cursor
+ESC[9999;9999H      → move cursor to (9999, 9999) — clamped to terminal size
+ESC[6n              → "report your position"
+ESC[u               → restore cursor
+```
+
+The client clamps the impossible position to its real `(rows, cols)` and answers with `ESC[<row>;<col>R`. That response lands on the next `{:data, ...}` channel message, the session's ANSI input parser (built on `vte`) decodes it into a `%ExRatatui.Event.Resize{}` just like any other resize event, and the SSH data handler intercepts it: resize the session in place, notify the running server via `{:ex_ratatui_resize, w, h}`. From the app's perspective it's identical to a real `window_change`, and subsequent `window_change` events during the session continue to work unchanged. The first frame may still paint briefly at 80x24 before the CPR response comes back, but on any terminal faster than a potato that window is invisible.
+
+### Always pass `-t` in subsystem mode
+
+OpenSSH does **not** allocate a PTY by default for subsystem invocations. `sftp` and similar binary protocols don't need one, but a TUI absolutely does — without a PTY the client's local terminal stays in cooked mode, which means keystrokes get line-buffered and locally echoed (painting garbage over the TUI) and the alt-screen teardown on disconnect bleeds into the shell prompt. Always force PTY allocation with `-t`:
+
+```sh
+# ✓ interactive — local terminal enters raw mode, keys flow to the server,
+#   quitting leaves a clean shell
+ssh -t nerves.local -s Elixir.MyApp.TUI
+
+# ✗ render bytes reach you but it is not usable interactively
+ssh nerves.local -s Elixir.MyApp.TUI
+```
 
 See the [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) project for an end-to-end Nerves firmware that wires two TUIs into a `nerves_ssh` daemon and runs them on a Raspberry Pi.
 
@@ -245,7 +271,7 @@ This is how you share infrastructure (PubSub topics, Ecto repos, feature toggles
   * **One channel per session.** We don't support SSH port forwarding or multiple channels on a single connection. If you need that, run a second daemon instance on a different port.
   * **No X11 / agent forwarding.** The TUI doesn't need either; both are unconditionally rejected.
   * **Shell mode needs a PTY.** Clients that connect with `ssh host` (no `-T`, no subsystem) must request a PTY or the channel is closed immediately. `ssh host -T` will _not_ work; `ssh host` or `ssh host -t` will.
-  * **Subsystem mode falls back to 80x24.** If a subsystem client doesn't allocate a PTY (some don't), the session is created at 80x24 and a subsequent `window_change` from the client resizes it.
+  * **Subsystem mode starts at 80x24 until the CPR reply comes back.** OTP consumes `pty_req` before a subsystem handler exists, so the transport discovers the client's real dimensions via a Cursor Position Report (`ESC[6n`) roundtrip on `channel_up`. The first frame paints at 80x24 until the response arrives on the next `{:data, ...}` message, which is usually invisibly fast but is not strictly instantaneous. Clients that don't answer `ESC[6n` at all (very rare — this is a half-century-old ANSI spec) stay at 80x24 until their first `window_change`.
   * **No keystroke replay.** If a client disconnects mid-session, the state is gone. There's no server-side scrollback or reattach (think `tmux`, not `screen`).
 
 ## Troubleshooting

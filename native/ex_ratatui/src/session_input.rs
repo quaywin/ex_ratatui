@@ -190,6 +190,22 @@ fn ascii_alt_byte(byte: u8) -> Option<char> {
 /// sequence isn't one we know how to translate — caller drops it on the
 /// floor rather than synthesising garbage.
 fn csi_to_event(params: &Params, action: char) -> Option<NifEvent> {
+    // Cursor Position Report: `CSI <row> ; <col> R`. The client sends
+    // this in response to `ESC[6n`, which the SSH subsystem transport
+    // emits right after parking the cursor at `ESC[9999;9999H` so the
+    // reported position is clamped to the terminal's real dimensions.
+    // That roundtrip is the only way subsystem-dispatched handlers can
+    // learn the client's pty size — OTP `:ssh` consumes pty_req before
+    // the handler exists, so it never reaches us as a channel request.
+    // Emit a Resize event with `(col, row)` to match the `(width,
+    // height)` shape the rest of the pipeline uses.
+    if action == 'R' {
+        let mut iter = params.iter();
+        let row: u16 = iter.next().and_then(|p| p.first().copied())?;
+        let col: u16 = iter.next().and_then(|p| p.first().copied())?;
+        return Some(NifEvent::Resize(col, row));
+    }
+
     let modifiers = csi_modifiers(params);
 
     if let Some(code) = simple_csi_code(action) {
@@ -479,6 +495,54 @@ mod tests {
         // emit nothing rather than fabricating an event.
         let events = parse(b"\x1b[X");
         assert!(events.is_empty());
+    }
+
+    #[test]
+    fn parses_cpr_response_as_resize() {
+        // CSI 30 ; 100 R — client reports cursor at row 30, col 100.
+        // That's the Cursor Position Report response triggered by
+        // `ESC[9999;9999H\e[6n`, which the SSH subsystem transport
+        // fires on channel_up to discover the client's real pty size.
+        // Emit as Resize(col=100, row=30) to match (width, height).
+        let events = parse(b"\x1b[30;100R");
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            NifEvent::Resize(w, h) => {
+                assert_eq!(*w, 100);
+                assert_eq!(*h, 30);
+            }
+            _ => panic!("expected Resize event"),
+        }
+    }
+
+    #[test]
+    fn cpr_response_without_both_params_is_dropped() {
+        // A malformed CPR with only a row (no col) should not produce
+        // a garbage Resize with a zero width — drop it cleanly.
+        let events = parse(b"\x1b[42R");
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn cpr_response_buffered_across_feeds() {
+        // The client may deliver the CPR response one byte at a time
+        // over the SSH channel. Ensure the parser reassembles it and
+        // emits the Resize event only when the sequence is complete.
+        let mut parser = InputParser::new();
+        let mut events = Vec::new();
+
+        for byte in b"\x1b[25;80R" {
+            parser.feed(&[*byte], &mut events);
+        }
+
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            NifEvent::Resize(w, h) => {
+                assert_eq!(*w, 80);
+                assert_eq!(*h, 25);
+            }
+            _ => panic!("expected Resize event"),
+        }
     }
 
     #[test]

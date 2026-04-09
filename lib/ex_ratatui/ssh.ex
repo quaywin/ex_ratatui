@@ -37,14 +37,46 @@ defmodule ExRatatui.SSH do
     * **Subsystem mode** can't wait for those messages: OTP `:ssh`
       matches the subsystem name against the daemon's `:subsystems`
       config and consumes the `{:subsystem, ...}` request itself to
-      dispatch us — `handle_ssh_msg/2` never sees it. Instead we
-      synthesize a default 80x24 session and start the server as soon as
-      `{:ssh_channel_up, ...}` arrives. Clients can still send
-      `window_change` afterwards to correct the size.
+      dispatch us — `handle_ssh_msg/2` never sees it. Worse, when the
+      client passes `-t` OTP *also* consumes the `pty_req` before
+      the subsystem dispatch fires: OTP hands it to the daemon's
+      default CLI handler (IEx on a `nerves_ssh` device) and silently
+      orphans that CLI process the moment our subsystem handler
+      takes over the channel. Neither pty_req nor its dimensions
+      reach us through any channel request.
+
+      To work around that, on `{:ssh_channel_up, ...}` we synthesize a
+      default 80x24 session, start the server, and immediately emit a
+      Cursor Position Report roundtrip —
+      `ESC[s ESC[9999;9999H ESC[6n ESC[u` — which parks the cursor at
+      (9999, 9999) so the client clamps it to the actual pty size,
+      then asks the client to report the position. The response
+      arrives on the next `{:data, ...}` channel message, is parsed
+      into a `%Event.Resize{}` by the session's ANSI input parser,
+      and the data handler resizes the session in place + notifies
+      the server. Clients can still send `{:window_change, ...}`
+      afterwards to track real runtime resizes.
 
   `subsystem/1` bakes `subsystem: true` into the init args so the
   channel handler can tell the two flows apart. Shell-mode init (via
   `ssh_cli:`) leaves the flag at its default `false`.
+
+  ### Client-side caveat: always pass `-t` in subsystem mode
+
+  OpenSSH does **not** allocate a PTY by default for `ssh host -s name`
+  — that's designed for protocols like `sftp` that don't need one. For
+  an interactive TUI you MUST force it with `-t`:
+
+      ssh -t nerves.local -s Elixir.MyApp.TUI   # ✓ works
+      ssh nerves.local -s Elixir.MyApp.TUI      # ✗ local tty stays in
+                                                #   cooked mode, keys are
+                                                #   line-buffered + echoed
+                                                #   locally, screen redraw
+                                                #   bleeds into the shell
+                                                #   prompt on exit
+
+  Without `-t`, render bytes still reach the client and the TUI runs —
+  it just can't be driven interactively.
 
   ## Subsystem helper
 
@@ -67,6 +99,7 @@ defmodule ExRatatui.SSH do
 
   require Logger
 
+  alias ExRatatui.Event
   alias ExRatatui.Session
 
   @default_sender &:ssh_connection.send/3
@@ -80,6 +113,20 @@ defmodule ExRatatui.SSH do
   # emit them itself or the TUI will paint over the client's shell
   # scrollback instead of onto a clean canvas.
   @enter_screen "\e[?1049h\e[?25l"
+
+  # Cursor Position Report roundtrip used to discover the client's real
+  # pty size in subsystem mode. OTP `:ssh` consumes pty_req before the
+  # subsystem handler exists (it hands it to the default CLI handler
+  # first), so `handle_ssh_msg/2` never sees it and we can't read the
+  # dimensions off the wire. Instead, park the cursor at (9999, 9999)
+  # — the client clamps the position to its actual size — then issue
+  # `ESC[6n`, which the client answers with `ESC[<row>;<col>R`. That
+  # response lands on the next `{:data, ...}` channel message, gets
+  # parsed into a `%Event.Resize{}` by the session input parser, and
+  # the `{:data, ...}` handler turns it into an `{:ex_ratatui_resize,
+  # w, h}` to the server. `ESC[s`/`ESC[u` save and restore the cursor
+  # position so ratatui's first frame still paints at the top-left.
+  @cpr_size_query "\e[s\e[9999;9999H\e[6n\e[u"
 
   # Inverse of `@enter_screen`, plus an SGR reset so any colours left
   # over from the final rendered frame don't bleed into the client's
@@ -176,16 +223,31 @@ defmodule ExRatatui.SSH do
     # Subsystem mode: OTP `:ssh` has already consumed the
     # `{:subsystem, ...}` channel request internally to dispatch us
     # here, so it will NEVER forward it to `handle_ssh_msg/2`. This is
-    # the only signal we get that the channel is ready, and no pty_req
-    # is coming either (subsystem clients typically don't allocate a
-    # pty). Build a default 80x24 session now and start the TUI server
-    # immediately. Any later `{:window_change, ...}` from the client
-    # will resize it through the existing handler below.
+    # the only signal we get that the channel is ready. Worse, when
+    # the client is invoked as `ssh -t -s <name>`, OTP ALSO consumes
+    # the pty_req before the subsystem dispatch fires — it hands it
+    # to the default CLI handler (IEx on nerves_ssh, for example) and
+    # that handler is silently orphaned the moment OTP rebinds the
+    # channel's user pid to us. So we don't see pty_req either, which
+    # means we can't learn the client's real dimensions from any
+    # incoming channel request.
+    #
+    # Build a default 80x24 session and start the TUI server
+    # immediately so the first frame goes out as soon as possible,
+    # then fire a Cursor Position Report roundtrip (`@cpr_size_query`)
+    # to discover the client's actual pty size. The response arrives
+    # as `ESC[<row>;<col>R` on the next `{:data, ...}` message, the
+    # session input parser decodes it into a `%Event.Resize{}`, and
+    # the `{:data, ...}` handler below turns that into a `Session`
+    # resize + a `{:ex_ratatui_resize, w, h}` notification to the
+    # server. `{:window_change, ...}` still correctly resizes after
+    # that if the user drags their terminal window.
     session = Session.new(80, 24)
     primed = %{state | session: session, conn: conn, channel_id: channel_id}
 
     case start_server(primed) do
       {:ok, server_pid} ->
+        _ = primed.sender.(conn, channel_id, @cpr_size_query)
         {:ok, %{primed | server_pid: server_pid, rendering: true}}
 
       {:error, _reason} ->
@@ -218,12 +280,32 @@ defmodule ExRatatui.SSH do
   @impl :ssh_server_channel
   def handle_ssh_msg(
         {:ssh_cm, conn, {:pty, channel_id, want_reply, {_term, width, height, _pw, _ph, _modes}}},
-        %__MODULE__{} = state
+        %__MODULE__{session: nil} = state
       ) do
+    # No session yet — this is the shell-mode path, where the session
+    # doesn't exist until the client sends pty_req (followed by
+    # shell_req, which starts the server).
     {w, h} = normalize_pty_size(width, height)
     session = Session.new(w, h)
     state.replier.(conn, want_reply, :success, channel_id)
     {:ok, %{state | session: session, conn: conn, channel_id: channel_id}}
+  end
+
+  def handle_ssh_msg(
+        {:ssh_cm, conn, {:pty, channel_id, want_reply, {_term, width, height, _pw, _ph, _modes}}},
+        %__MODULE__{session: %Session{}} = state
+      ) do
+    # Subsystem mode with `ssh -t -s`: channel_up already fired, we
+    # built a default 80x24 session and started the server. The client
+    # is now telling us its real PTY dimensions — resize the existing
+    # session in place instead of swapping in a new one, otherwise the
+    # server ends up rendering into a Session the SSH channel no longer
+    # points at. Mirrors the `window_change` handler below.
+    {w, h} = normalize_pty_size(width, height)
+    _ = Session.resize(state.session, w, h)
+    if is_pid(state.server_pid), do: send(state.server_pid, {:ex_ratatui_resize, w, h})
+    state.replier.(conn, want_reply, :success, channel_id)
+    {:ok, state}
   end
 
   def handle_ssh_msg(
@@ -251,12 +333,12 @@ defmodule ExRatatui.SSH do
 
   def handle_ssh_msg(
         {:ssh_cm, _conn, {:data, _channel_id, _type, data}},
-        %__MODULE__{session: %Session{}, server_pid: server_pid} = state
+        %__MODULE__{session: %Session{} = session, server_pid: server_pid} = state
       )
       when is_pid(server_pid) do
-    state.session
+    session
     |> Session.feed_input(data)
-    |> Enum.each(fn event -> send(server_pid, {:ex_ratatui_event, event}) end)
+    |> Enum.each(&dispatch_input_event(&1, session, server_pid))
 
     {:ok, state}
   end
@@ -337,6 +419,30 @@ defmodule ExRatatui.SSH do
         _ = state.sender.(state.conn, state.channel_id, @leave_screen)
         error
     end
+  end
+
+  @doc false
+  # Fans an event emitted by `Session.feed_input/2` out to the server.
+  # CPR responses (which the session parser surfaces as
+  # `%Event.Resize{}` values) are intercepted here: we resize the
+  # session in place and tell the server via `{:ex_ratatui_resize, w,
+  # h}` instead of forwarding a Resize event the way we would for a
+  # genuine runtime resize. All other events — Key, Mouse — flow
+  # through as `{:ex_ratatui_event, event}`.
+  def dispatch_input_event(
+        %Event.Resize{width: w, height: h},
+        %Session{} = session,
+        server_pid
+      )
+      when is_integer(w) and w > 0 and is_integer(h) and h > 0 do
+    _ = Session.resize(session, w, h)
+    send(server_pid, {:ex_ratatui_resize, w, h})
+    :ok
+  end
+
+  def dispatch_input_event(event, %Session{}, server_pid) do
+    send(server_pid, {:ex_ratatui_event, event})
+    :ok
   end
 
   @doc false

@@ -8,6 +8,7 @@ defmodule ExRatatui.SSHTest do
 
   @enter_screen "\e[?1049h\e[?25l"
   @leave_screen "\e[?1049l\e[?25h\e[0m"
+  @cpr_size_query "\e[s\e[9999;9999H\e[6n\e[u"
 
   defmodule SampleApp do
     use ExRatatui.App
@@ -160,6 +161,11 @@ defmodule ExRatatui.SSHTest do
       # enter_screen is queued before the server starts so the client's
       # terminal switches to the alt buffer before the first frame.
       assert_receive {:sent, :conn, 9, @enter_screen}
+      # CPR roundtrip fires right after the server boots so the client
+      # reports its real pty size — OTP consumed pty_req before our
+      # handler existed, so this is the only way to learn the actual
+      # dimensions in subsystem mode.
+      assert_receive {:sent, :conn, 9, @cpr_size_query}
 
       cleanup(new_state)
     end
@@ -261,6 +267,42 @@ defmodule ExRatatui.SSHTest do
       assert Session.size(new_state.session) == {80, 24}
       Session.close(new_state.session)
     end
+
+    test "resizes the existing session in place when one already exists" do
+      # Simulates the `ssh -t -s Elixir.MyApp.TUI` flow: subsystem mode
+      # already spun up an 80x24 session + server at channel_up, and now
+      # the client's pty_req arrives with the real dimensions. The
+      # handler must resize in place (same session reference) — swapping
+      # the struct would leave the server rendering into a Session the
+      # channel no longer points at.
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+
+      existing = Session.new(80, 24)
+
+      state = %{
+        build_state()
+        | session: existing,
+          server_pid: server,
+          channel_id: 7,
+          conn: :conn_ref,
+          rendering: true
+      }
+
+      pty_msg =
+        {:ssh_cm, :conn_ref, {:pty, 7, true, {~c"xterm", 120, 40, 0, 0, []}}}
+
+      assert {:ok, new_state} = SSH.handle_ssh_msg(pty_msg, state)
+
+      # Same Session struct — not a new one.
+      assert new_state.session === existing
+      assert Session.size(existing) == {120, 40}
+      assert new_state.server_pid == server
+
+      assert_receive {:replied, :conn_ref, true, :success, 7}
+      assert_receive {:server_got, {:ex_ratatui_resize, 120, 40}}
+
+      Session.close(existing)
+    end
   end
 
   describe "handle_ssh_msg :shell" do
@@ -322,6 +364,81 @@ defmodule ExRatatui.SSHTest do
                        %ExRatatui.Event.Key{code: "a", modifiers: [], kind: "press"}}}
 
       Session.close(state.session)
+      GenServer.stop(server)
+    end
+
+    test "a Cursor Position Report response resizes the session in place" do
+      # Regression: subsystem mode can't read pty_req off the wire
+      # because OTP consumes it before the subsystem handler takes over
+      # the channel. Instead, channel_up fires an `ESC[6n` CPR query,
+      # the client answers with `ESC[<row>;<col>R` on the next
+      # `{:data, ...}` message, and the session's ANSI parser decodes
+      # it into a `%Event.Resize{}`. The data handler must intercept
+      # that Resize event and do the same dance as `{:window_change,
+      # ...}` — resize the existing session in place + notify the
+      # server via `{:ex_ratatui_resize, w, h}` — instead of forwarding
+      # it as a plain `{:ex_ratatui_event, ...}` message.
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      state =
+        build_state(subsystem: true)
+        |> Map.merge(%{
+          session: session,
+          server_pid: server,
+          channel_id: 5,
+          conn: :conn,
+          rendering: true
+        })
+
+      # `ESC[40;120R` = row 40, col 120, so the session should end up
+      # at width=120, height=40.
+      data_msg = {:ssh_cm, :conn, {:data, 5, 0, "\e[40;120R"}}
+      assert {:ok, ^state} = SSH.handle_ssh_msg(data_msg, state)
+
+      assert Session.size(session) == {120, 40}
+      assert_receive {:server_got, {:ex_ratatui_resize, 120, 40}}
+      # CPR responses must never reach the server as a plain input
+      # event — the Server would treat it as a synthetic resize event
+      # and double-route the dimensions through render state.
+      refute_receive {:server_got, {:ex_ratatui_event, _}}
+
+      Session.close(session)
+      GenServer.stop(server)
+    end
+  end
+
+  describe "dispatch_input_event/3" do
+    test "Resize events trigger a session resize + :ex_ratatui_resize to the server" do
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      assert :ok =
+               SSH.dispatch_input_event(
+                 %ExRatatui.Event.Resize{width: 132, height: 50},
+                 session,
+                 server
+               )
+
+      assert Session.size(session) == {132, 50}
+      assert_receive {:server_got, {:ex_ratatui_resize, 132, 50}}
+
+      Session.close(session)
+      GenServer.stop(server)
+    end
+
+    test "non-Resize events are forwarded as :ex_ratatui_event" do
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      key_event = %ExRatatui.Event.Key{code: "q", modifiers: [], kind: "press"}
+      assert :ok = SSH.dispatch_input_event(key_event, session, server)
+
+      assert_receive {:server_got, {:ex_ratatui_event, ^key_event}}
+      # Session is untouched — no resize happened.
+      assert Session.size(session) == {80, 24}
+
+      Session.close(session)
       GenServer.stop(server)
     end
   end
