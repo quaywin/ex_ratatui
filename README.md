@@ -219,20 +219,25 @@ See [`phoenix_ex_ratatui_example`](https://github.com/mcass19/phoenix_ex_ratatui
 
 ### Nerves + `nerves_ssh`
 
-If you're already running `nerves_ssh` on a Nerves device, register `ExRatatui.SSH` as a subsystem instead of standing up a second daemon:
+If you're already running `nerves_ssh` on a Nerves device, register `ExRatatui.SSH` as a subsystem instead of standing up a second daemon. Put this in `config/runtime.exs` — not `target.exs` — because `ExRatatui.SSH.subsystem/1` is a function call and `target.exs` is evaluated before deps are compiled for the target on a fresh build (see the [SSH transport guide](guides/ssh_transport.md#integrating-with-nerves_ssh) for the full story):
 
 ```elixir
-config :nerves_ssh,
-  subsystems: [
-    :ssh_sftpd.subsystem_spec(cwd: ~c"/"),
-    ExRatatui.SSH.subsystem(MyApp.TUI)
-  ]
+# config/runtime.exs
+import Config
+
+if Application.spec(:nerves_ssh) do
+  config :nerves_ssh,
+    subsystems: [
+      :ssh_sftpd.subsystem_spec(cwd: ~c"/"),
+      ExRatatui.SSH.subsystem(MyApp.TUI)
+    ]
+end
 ```
 
 Connect with:
 
 ```sh
-ssh nerves.local -s Elixir.MyApp.TUI
+ssh -t nerves.local -s Elixir.MyApp.TUI
 ```
 
 See [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) for a complete Nerves firmware that wires two TUIs (a system monitor and an LED control app) into a `nerves_ssh` daemon and runs them on a Raspberry Pi.

@@ -83,14 +83,19 @@ With `transport: :ssh` set, `MyApp.TUI.start_link/1` routes through `ExRatatui.S
 If you're already running `nerves_ssh` on a Nerves device, you don't need to stand up a second daemon. `nerves_ssh` accepts a `subsystems:` option that takes OTP `:ssh_server_channel` modules, and `ExRatatui.SSH` is exactly one of those. Use the `subsystem/1` helper to build the tuple in the shape OTP wants:
 
 ```elixir
-# In your Nerves target config:
-config :nerves_ssh,
-  authorized_keys: [File.read!("/root/.ssh/authorized_keys")],
-  subsystems: [
-    :ssh_sftpd.subsystem_spec(cwd: ~c"/"),
-    ExRatatui.SSH.subsystem(MyApp.TUI)
-  ]
+# config/runtime.exs
+import Config
+
+if Application.spec(:nerves_ssh) do
+  config :nerves_ssh,
+    subsystems: [
+      :ssh_sftpd.subsystem_spec(cwd: ~c"/"),
+      ExRatatui.SSH.subsystem(MyApp.TUI)
+    ]
+end
 ```
+
+> **Why `runtime.exs`, not `target.exs`?** On a fresh `MIX_TARGET=rpi4 mix compile`, Mix evaluates `config/target.exs` *before* it compiles deps for the target — so `ExRatatui.SSH` isn't on the code path yet and any function call against it crashes with `module ExRatatui.SSH is not available`. `runtime.exs` is evaluated at device boot instead, after every beam file in the release is loaded but before the OTP application controller starts `:nerves_ssh`, which is exactly the window we need. The `Application.spec(:nerves_ssh)` guard keeps host builds (where `:nerves_ssh` isn't a dep) silent. `authorized_keys` should still live in `target.exs` since it reads the developer's keys from `~/.ssh/` and bakes them into the firmware image.
 
 The user then connects with:
 
