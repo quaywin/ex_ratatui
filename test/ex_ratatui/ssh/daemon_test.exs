@@ -209,17 +209,25 @@ defmodule ExRatatui.SSH.DaemonTest do
       assert daemon_opts[:user_dir] == ~c"/etc/users"
       assert daemon_opts[:authorized_keys] == ~c"contents"
 
-      # Our channel wire-up is present
+      # Our channel wire-up is present. ssh_cli handles shell clients —
+      # it waits for pty_req + shell_req, so it must NOT carry
+      # `subsystem: true` (otherwise channel_up would race the pty).
       assert {ExRatatui.SSH, cli_args} = daemon_opts[:ssh_cli]
       assert cli_args[:mod] == SampleApp
       assert cli_args[:app_opts] == [foo: :bar]
+      refute cli_args[:subsystem]
       assert daemon_opts[:exec] == :disabled
 
-      # Subsystem carries the same cli_args so `ssh -s <name>` works too
+      # The :subsystems entry registers the same channel module under
+      # the app module's full atom name. `subsystem: true` is what tells
+      # the handler to kick off on channel_up instead of waiting for a
+      # shell request (OTP consumes the {:subsystem, _} message
+      # internally so handle_ssh_msg never sees it).
       assert [{name, {ExRatatui.SSH, sub_args}}] = daemon_opts[:subsystems]
       assert name == ~c"Elixir.ExRatatui.SSH.DaemonTest.SampleApp"
       assert sub_args[:mod] == SampleApp
       assert sub_args[:app_opts] == [foo: :bar]
+      assert sub_args[:subsystem] == true
     end
 
     test "defaults app_opts to []" do

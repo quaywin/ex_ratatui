@@ -27,12 +27,24 @@ defmodule ExRatatui.SSH do
   plugs this into its existing daemon — see `subsystem/1` for the exact
   shape it expects.
 
-  ## PTY is required
+  ### Shell vs subsystem startup
 
-  The TUI makes no sense without a pty: no dimensions, no terminal modes,
-  nowhere to send ANSI. If the client doesn't request a pty before
-  starting the shell/subsystem we reject the channel. The client will
-  see this as an immediate disconnect.
+  The two modes use different triggers to spin up the server:
+
+    * **Shell mode** waits for the client's `pty_req` (to size the
+      session) and then `shell_req` (to launch). If the client skips the
+      pty, the channel is rejected on the shell request.
+    * **Subsystem mode** can't wait for those messages: OTP `:ssh`
+      matches the subsystem name against the daemon's `:subsystems`
+      config and consumes the `{:subsystem, ...}` request itself to
+      dispatch us — `handle_ssh_msg/2` never sees it. Instead we
+      synthesize a default 80x24 session and start the server as soon as
+      `{:ssh_channel_up, ...}` arrives. Clients can still send
+      `window_change` afterwards to correct the size.
+
+  `subsystem/1` bakes `subsystem: true` into the init args so the
+  channel handler can tell the two flows apart. Shell-mode init (via
+  `ssh_cli:`) leaves the flag at its default `false`.
 
   ## Subsystem helper
 
@@ -90,7 +102,8 @@ defmodule ExRatatui.SSH do
     :sender,
     :replier,
     :starter,
-    rendering: false
+    rendering: false,
+    subsystem_mode: false
   ]
 
   @type t :: %__MODULE__{
@@ -103,7 +116,8 @@ defmodule ExRatatui.SSH do
           sender: (term(), non_neg_integer(), iodata() -> :ok | {:error, term()}),
           replier: (term(), boolean(), :success | :failure, non_neg_integer() -> :ok),
           starter: (keyword() -> {:ok, pid()} | {:error, term()}),
-          rendering: boolean()
+          rendering: boolean(),
+          subsystem_mode: boolean()
         }
 
   @doc """
@@ -115,14 +129,20 @@ defmodule ExRatatui.SSH do
   so each app module gets its own distinct subsystem. Two apps
   configured into the same daemon will not collide.
 
+  The init args include `subsystem: true` so the channel handler knows
+  it was spawned via OTP's subsystem dispatch (which consumes the
+  `{:subsystem, ...}` message internally) and can start the TUI server
+  as soon as the channel is up, instead of waiting for a shell request
+  that will never arrive.
+
   ## Examples
 
       iex> ExRatatui.SSH.subsystem(SomeTUIModule)
-      {~c"Elixir.SomeTUIModule", {ExRatatui.SSH, [mod: SomeTUIModule]}}
+      {~c"Elixir.SomeTUIModule", {ExRatatui.SSH, [mod: SomeTUIModule, subsystem: true]}}
   """
   @spec subsystem(module()) :: {charlist(), {module(), keyword()}}
   def subsystem(mod) when is_atom(mod) do
-    {String.to_charlist(Atom.to_string(mod)), {__MODULE__, [mod: mod]}}
+    {String.to_charlist(Atom.to_string(mod)), {__MODULE__, [mod: mod, subsystem: true]}}
   end
 
   ## :ssh_server_channel callbacks
@@ -134,23 +154,51 @@ defmodule ExRatatui.SSH do
     sender = Keyword.get(args, :sender, @default_sender)
     replier = Keyword.get(args, :replier, @default_replier)
     starter = Keyword.get(args, :starter, @default_starter)
+    subsystem_mode = Keyword.get(args, :subsystem, false)
 
     state = %__MODULE__{
       mod: mod,
       app_opts: app_opts,
       sender: sender,
       replier: replier,
-      starter: starter
+      starter: starter,
+      subsystem_mode: subsystem_mode
     }
 
     {:ok, state}
   end
 
   @impl :ssh_server_channel
+  def handle_msg(
+        {:ssh_channel_up, channel_id, conn},
+        %__MODULE__{subsystem_mode: true} = state
+      ) do
+    # Subsystem mode: OTP `:ssh` has already consumed the
+    # `{:subsystem, ...}` channel request internally to dispatch us
+    # here, so it will NEVER forward it to `handle_ssh_msg/2`. This is
+    # the only signal we get that the channel is ready, and no pty_req
+    # is coming either (subsystem clients typically don't allocate a
+    # pty). Build a default 80x24 session now and start the TUI server
+    # immediately. Any later `{:window_change, ...}` from the client
+    # will resize it through the existing handler below.
+    session = Session.new(80, 24)
+    primed = %{state | session: session, conn: conn, channel_id: channel_id}
+
+    case start_server(primed) do
+      {:ok, server_pid} ->
+        {:ok, %{primed | server_pid: server_pid, rendering: true}}
+
+      {:error, _reason} ->
+        Session.close(session)
+        {:stop, channel_id, state}
+    end
+  end
+
   def handle_msg({:ssh_channel_up, channel_id, conn}, %__MODULE__{} = state) do
-    # Record the channel/connection now. We can't build the Session yet
-    # because we don't know the pty dimensions — that happens in the
-    # {:pty, ...} handler below.
+    # Shell mode: record the channel/connection now. We can't build the
+    # Session yet because we don't know the pty dimensions — that
+    # happens in the {:pty, ...} handler below, followed by {:shell,
+    # ...} which starts the server.
     {:ok, %{state | channel_id: channel_id, conn: conn}}
   end
 
@@ -190,45 +238,6 @@ defmodule ExRatatui.SSH do
         {:ssh_cm, conn, {:shell, channel_id, want_reply}},
         %__MODULE__{} = state
       ) do
-    case start_server(state) do
-      {:ok, server_pid} ->
-        state.replier.(conn, want_reply, :success, channel_id)
-        {:ok, %{state | server_pid: server_pid, rendering: true}}
-
-      {:error, _reason} ->
-        state.replier.(conn, want_reply, :failure, channel_id)
-        {:stop, channel_id, state}
-    end
-  end
-
-  def handle_ssh_msg(
-        {:ssh_cm, conn, {:subsystem, channel_id, want_reply, _name}},
-        %__MODULE__{session: nil} = state
-      ) do
-    # Subsystem requests arrive with no pty — we need one to render,
-    # so synthesize a default 80x24 session. The client can always
-    # send a window_change to correct the size afterwards.
-    session = Session.new(80, 24)
-    primed = %{state | session: session, conn: conn, channel_id: channel_id}
-
-    case start_server(primed) do
-      {:ok, server_pid} ->
-        state.replier.(conn, want_reply, :success, channel_id)
-        {:ok, %{primed | server_pid: server_pid, rendering: true}}
-
-      {:error, _reason} ->
-        Session.close(session)
-        state.replier.(conn, want_reply, :failure, channel_id)
-        {:stop, channel_id, state}
-    end
-  end
-
-  def handle_ssh_msg(
-        {:ssh_cm, conn, {:subsystem, channel_id, want_reply, _name}},
-        %__MODULE__{} = state
-      ) do
-    # Subsystem request after a pty — e.g. a client that sent pty_req
-    # first and then asked for our subsystem. Reuse the existing session.
     case start_server(state) do
       {:ok, server_pid} ->
         state.replier.(conn, want_reply, :success, channel_id)

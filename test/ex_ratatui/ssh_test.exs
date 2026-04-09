@@ -87,6 +87,19 @@ defmodule ExRatatui.SSHTest do
       assert state.replier == (&:ssh_connection.reply_request/4)
       assert state.starter == (&ExRatatui.Server.start_link/1)
     end
+
+    test "defaults subsystem_mode to false" do
+      # Shell mode (via ssh_cli) is the default so plain `use
+      # ExRatatui.App` callers who hand-start the handler don't
+      # accidentally opt into subsystem semantics.
+      {:ok, state} = SSH.init(mod: SampleApp)
+      assert state.subsystem_mode == false
+    end
+
+    test "reads subsystem: true from init args" do
+      {:ok, state} = SSH.init(mod: SampleApp, subsystem: true)
+      assert state.subsystem_mode == true
+    end
   end
 
   describe "subsystem/1" do
@@ -95,14 +108,70 @@ defmodule ExRatatui.SSHTest do
       assert name == ~c"Elixir.ExRatatui.SSHTest.SampleApp"
       assert args[:mod] == SampleApp
     end
+
+    test "flags its args with `subsystem: true`" do
+      # OTP consumes the {:subsystem, _} request internally when
+      # dispatching via the :subsystems config, so the handler never
+      # sees it. This flag is what tells the channel process it was
+      # spawned that way (so it starts the server on channel_up instead
+      # of waiting for a shell request).
+      assert {_name, {ExRatatui.SSH, args}} = SSH.subsystem(SampleApp)
+      assert args[:subsystem] == true
+    end
   end
 
   describe "handle_msg :ssh_channel_up" do
-    test "records the channel id and connection" do
+    test "shell mode just records the channel id and connection" do
+      # Shell-mode handlers wait for pty_req + shell_req before starting
+      # anything — channel_up is just a bookkeeping beat.
       state = build_state()
       assert {:ok, updated} = SSH.handle_msg({:ssh_channel_up, 7, :fake_conn}, state)
       assert updated.channel_id == 7
       assert updated.conn == :fake_conn
+      assert updated.session == nil
+      assert updated.server_pid == nil
+      assert updated.rendering == false
+    end
+
+    test "subsystem mode synthesizes an 80x24 session and starts the server" do
+      # Subsystem mode can't wait for pty_req/shell_req because OTP
+      # consumes the subsystem dispatch itself and only forwards
+      # channel_up. The handler has to boot the server from that
+      # trigger alone.
+      test_pid = self()
+
+      starter = fn opts ->
+        send(test_pid, {:server_opts, opts})
+        {:ok, spawn_server(opts)}
+      end
+
+      state = build_state(subsystem: true, starter: starter)
+
+      assert {:ok, new_state} = SSH.handle_msg({:ssh_channel_up, 9, :conn}, state)
+
+      assert %Session{} = new_state.session
+      assert Session.size(new_state.session) == {80, 24}
+      assert new_state.conn == :conn
+      assert new_state.channel_id == 9
+      assert is_pid(new_state.server_pid)
+      assert new_state.rendering == true
+
+      assert_receive {:server_opts, _}
+      # enter_screen is queued before the server starts so the client's
+      # terminal switches to the alt buffer before the first frame.
+      assert_receive {:sent, :conn, 9, @enter_screen}
+
+      cleanup(new_state)
+    end
+
+    test "subsystem mode closes the session and stops on starter failure" do
+      state = build_state(subsystem: true, starter: fn _ -> {:error, :nope} end)
+
+      assert {:stop, 9, _} = SSH.handle_msg({:ssh_channel_up, 9, :conn}, state)
+      # start_server/1 emits both the prelude and the cleanup so a
+      # briefly connected client doesn't get stranded in the alt buffer.
+      assert_receive {:sent, :conn, 9, @enter_screen}
+      assert_receive {:sent, :conn, 9, @leave_screen}
     end
   end
 
@@ -231,72 +300,6 @@ defmodule ExRatatui.SSHTest do
       # emit a second leave-screen (start_server already did).
       assert new_state.rendering == false
       assert_receive {:replied, :conn, true, :failure, _}
-      Session.close(state.session)
-    end
-  end
-
-  describe "handle_ssh_msg :subsystem without a prior pty" do
-    test "synthesizes an 80x24 session and starts the server" do
-      test_pid = self()
-
-      starter = fn opts ->
-        send(test_pid, {:server_opts, opts})
-        {:ok, spawn_server(opts)}
-      end
-
-      state = build_state(starter: starter)
-
-      sub_msg = {:ssh_cm, :conn, {:subsystem, 9, true, ~c"Elixir.X"}}
-      assert {:ok, new_state} = SSH.handle_ssh_msg(sub_msg, state)
-
-      assert %Session{} = new_state.session
-      assert Session.size(new_state.session) == {80, 24}
-      assert new_state.conn == :conn
-      assert new_state.channel_id == 9
-      assert is_pid(new_state.server_pid)
-      assert new_state.rendering == true
-
-      assert_receive {:replied, :conn, true, :success, 9}
-      assert_receive {:server_opts, _}
-
-      cleanup(new_state)
-    end
-
-    test "closes the synthesized session and stops on starter failure" do
-      state = build_state(starter: fn _ -> {:error, :nope} end)
-      sub_msg = {:ssh_cm, :conn, {:subsystem, 2, false, ~c"Elixir.X"}}
-
-      assert {:stop, 2, _} = SSH.handle_ssh_msg(sub_msg, state)
-      assert_receive {:replied, :conn, false, :failure, 2}
-    end
-  end
-
-  describe "handle_ssh_msg :subsystem with an existing pty" do
-    test "reuses the existing session and starts the server" do
-      state =
-        build_state(starter: fn opts -> {:ok, spawn_server(opts)} end)
-        |> prime_with_pty(120, 40)
-
-      sub_msg = {:ssh_cm, :conn, {:subsystem, state.channel_id, true, ~c"Elixir.X"}}
-
-      assert {:ok, new_state} = SSH.handle_ssh_msg(sub_msg, state)
-      # Session is the same instance
-      assert new_state.session == state.session
-      assert Session.size(new_state.session) == {120, 40}
-      assert new_state.rendering == true
-
-      cleanup(new_state)
-    end
-
-    test "stops on starter failure with an existing pty" do
-      state =
-        build_state(starter: fn _opts -> {:error, :nope} end)
-        |> prime_with_pty(100, 30)
-
-      sub_msg = {:ssh_cm, :conn, {:subsystem, state.channel_id, true, ~c"Elixir.X"}}
-      assert {:stop, _id, _state} = SSH.handle_ssh_msg(sub_msg, state)
-      assert_receive {:replied, :conn, true, :failure, _}
-
       Session.close(state.session)
     end
   end

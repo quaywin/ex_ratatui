@@ -173,15 +173,21 @@ defmodule ExRatatui.SSH.Daemon do
     app_opts = Keyword.get(opts, :app_opts, [])
 
     # `ssh_cli: {M, Args}` replaces OTP's default shell channel handler
-    # with ours, so shell _and_ subsystem requests flow through
-    # ExRatatui.SSH.handle_ssh_msg/2. The subsystem list is a
-    # belt-and-braces so named-subsystem clients work identically; we
-    # bake the same args into it so `:app_opts` reaches mount/1 either
-    # way.
+    # with ours, so shell requests flow through
+    # ExRatatui.SSH.handle_ssh_msg/2 — this path waits for pty_req +
+    # shell_req to start the server, so `subsystem: false` is correct.
     cli_args = [mod: mod, app_opts: app_opts]
 
+    # The subsystem entry is registered under the app module's atom
+    # name, so `ssh -s Elixir.MyApp.TUI host` reaches the same channel
+    # handler. When OTP dispatches a subsystem it consumes the
+    # `{:subsystem, ...}` request internally and only sends us
+    # `{:ssh_channel_up, ...}` — `subsystem: true` tells the handler to
+    # kick off a default-sized session and server from that trigger
+    # instead of waiting for a shell request that will never arrive.
     {name, _} = ExRatatui.SSH.subsystem(mod)
-    subsystem = {name, {ExRatatui.SSH, cli_args}}
+    subsystem_args = Keyword.put(cli_args, :subsystem, true)
+    subsystem = {name, {ExRatatui.SSH, subsystem_args}}
 
     base = [
       ssh_cli: {ExRatatui.SSH, cli_args},

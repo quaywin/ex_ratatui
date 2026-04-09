@@ -100,7 +100,7 @@ ssh nerves.local -s Elixir.MyApp.TUI
 
 The subsystem name is the full Elixir module name as a charlist (because that's what SSH expects), so two different app modules configured into the same daemon get distinct subsystem names and don't collide.
 
-When a client connects via subsystem, no PTY is negotiated by default — `ExRatatui.SSH` synthesizes a fallback 80x24 session and the client's terminal emulator sends a `window_change` once it knows its real size. Clients that _do_ request a PTY first (most modern `ssh` clients with `-t`) will render at the exact requested size from the first frame.
+`subsystem/1` bakes a `subsystem: true` flag into its init args so the channel handler knows it was dispatched via OTP's `:subsystems` path. That matters because OTP `:ssh` consumes the `{:subsystem, ...}` channel request _internally_ when it matches the name — `handle_ssh_msg/2` never sees it. The only lifecycle message the handler receives is `{:ssh_channel_up, ...}`, and it uses that as its cue to synthesize a default 80x24 session and start the TUI server immediately. Any subsequent `window_change` from the client's terminal emulator resizes the session through the existing handler, so the first couple of frames may render at 80x24 before snapping to the client's real dimensions.
 
 See the [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) project for an end-to-end Nerves firmware that wires two TUIs into a `nerves_ssh` daemon and runs them on a Raspberry Pi.
 
@@ -260,7 +260,7 @@ This is how you share infrastructure (PubSub topics, Ecto repos, feature toggles
 : Another process holds the port. Use `ss -tlnp | grep 2222` to find it, or pick a different port.
 
 **Silent failure under `nerves_ssh`**
-: `nerves_ssh` logs its subsystem errors quietly. Enable verbose SSH logging on the client (`ssh -vv ...`) to see the server's subsystem-failure reason.
+: `nerves_ssh` logs its subsystem errors quietly. Enable verbose SSH logging on the client (`ssh -vv ...`) to see the server's subsystem-failure reason. If you're on `ex_ratatui` `0.6.0` specifically, `ssh host -s Elixir.MyApp.TUI` hangs instead of rendering — upgrade to `0.6.1` or newer; the subsystem handler used to wait for a `{:subsystem, _}` message that OTP consumes before the handler ever sees it.
 
 **Tests time out waiting for an initial render**
 : The SSH channel triggers the initial render synchronously inside the linked Server's `init/1` (via `continue_init_ssh/3`) before any client input can arrive. If your `mount/1` does long I/O (e.g. HTTP, DB), the channel won't see render bytes until that finishes — move expensive work to `handle_info(:refresh, ...)` with a self-scheduled message so the first render doesn't block the handshake.

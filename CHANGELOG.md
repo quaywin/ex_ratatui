@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **SSH subsystem dispatch** — `ssh host -s Elixir.MyApp.TUI` (and `ExRatatui.SSH.subsystem/1` under `nerves_ssh`) would hang forever instead of rendering. The channel handler was waiting for a `{:ssh_cm, _, {:subsystem, ...}}` message inside `handle_ssh_msg/2`, but OTP `:ssh` consumes that request internally when it matches a name in the daemon's `:subsystems` config — the handler only ever receives `{:ssh_channel_up, ...}`. `ExRatatui.SSH` now detects subsystem-mode dispatch (via a new `subsystem: true` flag baked into the init args by `subsystem/1` and `ExRatatui.SSH.Daemon`) and synthesizes a default 80x24 session + starts the TUI server directly from `{:ssh_channel_up, ...}`. Shell-mode startup (via `ssh_cli`) is unchanged — it still waits for `pty_req` + `shell_req` as before
+- **SSH subsystem startup** — added a shell-vs-subsystem section to `ExRatatui.SSH`'s moduledoc and the `guides/ssh_transport.md` guide explaining which message triggers server boot in each mode
+
 ## [0.6.0] - 2026-04-09
 
 ### Added
