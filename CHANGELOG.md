@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-09
+
 ### Added
 
 - **SSH transport** — serve any `ExRatatui.App` to remote clients over OTP `:ssh`. New `transport: :ssh` option on `ExRatatui.App` and a standalone `ExRatatui.SSH.Daemon` for direct supervision-tree use. Each connected client gets its own isolated TUI session; works as a primary daemon or as a `nerves_ssh` subsystem via `ExRatatui.SSH.subsystem/1`
@@ -193,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/mcass19/ex_ratatui/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/mcass19/ex_ratatui/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/mcass19/ex_ratatui/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/mcass19/ex_ratatui/compare/v0.4.1...v0.4.2
