@@ -154,6 +154,19 @@ fn textarea_line_count(resource: ResourceArc<TextareaResource>) -> Result<usize,
     Ok(textarea.lines().len())
 }
 
+#[rustler::nif]
+fn textarea_snapshot(
+    resource: ResourceArc<TextareaResource>,
+) -> Result<(String, usize, usize), Error> {
+    let textarea = resource
+        .state
+        .lock()
+        .map_err(|_| Error::Term(Box::new("textarea lock poisoned")))?;
+    let value = textarea.lines().join("\n");
+    let cursor = textarea.cursor();
+    Ok((value, cursor.0, cursor.1))
+}
+
 // -- Rendering --
 
 pub struct TextareaRenderData {

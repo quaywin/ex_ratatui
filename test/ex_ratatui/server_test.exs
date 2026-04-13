@@ -1286,5 +1286,74 @@ defmodule ExRatatui.ServerTest do
       assert result[:width] == 100
       assert result[:height] == 50
     end
+
+    test "stateful widgets are snapshot before distribution" do
+      # A DistApp variant that renders a TextInput + Textarea so we can
+      # verify the server snapshots NIF references into plain tuples.
+      defmodule DistStatefulApp do
+        use ExRatatui.App
+
+        @impl true
+        def mount(opts) do
+          test_pid = Keyword.fetch!(opts, :test_pid)
+          ti_state = ExRatatui.text_input_new()
+          ExRatatui.text_input_set_value(ti_state, "hello")
+          ta_state = ExRatatui.textarea_new()
+          ExRatatui.textarea_set_value(ta_state, "line1\nline2")
+          send(test_pid, {:mounted, opts})
+          {:ok, %{test_pid: test_pid, ti: ti_state, ta: ta_state}}
+        end
+
+        @impl true
+        def render(state, frame) do
+          send(state.test_pid, :rendered)
+
+          [
+            {%ExRatatui.Widgets.TextInput{state: state.ti},
+             %Rect{x: 0, y: 0, width: frame.width, height: 1}},
+            {%ExRatatui.Widgets.Textarea{state: state.ta},
+             %Rect{x: 0, y: 1, width: frame.width, height: frame.height - 1}}
+          ]
+        end
+
+        @impl true
+        def handle_event(_event, state), do: {:noreply, state}
+      end
+
+      {:ok, pid} =
+        ExRatatui.Server.start_link(
+          mod: DistStatefulApp,
+          name: nil,
+          test_pid: self(),
+          transport: {:distributed_server, self(), 40, 10}
+        )
+
+      assert_receive {:mounted, _}, 1000
+      assert_receive :rendered, 1000
+      assert_receive {:ex_ratatui_draw, widgets}, 1000
+
+      # TextInput state must be a snapshot tuple, not a NIF reference.
+      [
+        {%ExRatatui.Widgets.TextInput{state: ti_state}, _},
+        {%ExRatatui.Widgets.Textarea{state: ta_state}, _}
+      ] =
+        widgets
+
+      assert is_tuple(ti_state), "expected TextInput state to be a snapshot tuple"
+      refute is_reference(ti_state)
+      assert {value, cursor, viewport_offset} = ti_state
+      assert value == "hello"
+      assert is_integer(cursor)
+      assert is_integer(viewport_offset)
+
+      assert is_tuple(ta_state), "expected Textarea state to be a snapshot tuple"
+      refute is_reference(ta_state)
+      assert {ta_value, ta_row, ta_col} = ta_state
+      assert ta_value == "line1\nline2"
+      assert is_integer(ta_row)
+      assert is_integer(ta_col)
+
+      GenServer.stop(pid)
+    end
   end
 end

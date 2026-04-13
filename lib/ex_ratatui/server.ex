@@ -444,8 +444,28 @@ defmodule ExRatatui.Server do
   end
 
   defp draw_widgets(%__MODULE__{transport: :distributed_server, client_pid: pid}, widgets) do
-    send(pid, {:ex_ratatui_draw, widgets})
+    send(pid, {:ex_ratatui_draw, snapshot_stateful_widgets(widgets)})
     :ok
+  end
+
+  # NIF resource references (ResourceArc) cannot cross BEAM node boundaries
+  # — they're pointers into Rust memory on the local node. Stateful widgets
+  # (TextInput, Textarea) hold their mutable state in such references. Before
+  # sending a widget list over distribution, we snapshot each stateful widget's
+  # NIF state into a plain tuple that Erlang distribution can serialize. The
+  # Rust decoder on the client node reconstructs a temporary ResourceArc from
+  # the snapshot so the rest of the rendering pipeline stays uniform.
+  defp snapshot_stateful_widgets(widgets) do
+    Enum.map(widgets, fn
+      {%ExRatatui.Widgets.TextInput{state: ref} = widget, rect} when is_reference(ref) ->
+        {%{widget | state: ExRatatui.Native.text_input_snapshot(ref)}, rect}
+
+      {%ExRatatui.Widgets.Textarea{state: ref} = widget, rect} when is_reference(ref) ->
+        {%{widget | state: ExRatatui.Native.textarea_snapshot(ref)}, rect}
+
+      other ->
+        other
+    end)
   end
 
   defp runtime_mode(mod) do

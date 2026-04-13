@@ -18,6 +18,7 @@ defmodule ExRatatui.Native do
     text_input_get_value: 1,
     text_input_set_value: 2,
     text_input_cursor: 1,
+    text_input_snapshot: 1,
     session_new: 2,
     session_close: 1,
     session_draw: 2,
@@ -31,6 +32,7 @@ defmodule ExRatatui.Native do
     textarea_get_value: 1,
     textarea_set_value: 2,
     textarea_cursor: 1,
+    textarea_snapshot: 1,
     textarea_line_count: 1
   ]
 

@@ -118,6 +118,37 @@ defmodule ExRatatui.BridgeTest do
     end
   end
 
+  test "encode_command accepts snapshot tuples for TextInput state (distributed path)" do
+    rect = %Rect{x: 0, y: 0, width: 20, height: 1}
+    snapshot = {"hello", 3, 0}
+    {widget, _} = Bridge.encode_command({%TextInput{state: snapshot}, rect})
+
+    assert widget["type"] == "text_input"
+    assert widget["state"] == {"hello", 3, 0}
+  end
+
+  test "encode_command accepts snapshot tuples for Textarea state (distributed path)" do
+    rect = %Rect{x: 0, y: 0, width: 20, height: 5}
+    snapshot = {"line1\nline2", 1, 3}
+    {widget, _} = Bridge.encode_command({%Textarea{state: snapshot}, rect})
+
+    assert widget["type"] == "textarea"
+    assert widget["state"] == {"line1\nline2", 1, 3}
+  end
+
+  test "snapshot tuple roundtrips through Session.draw without error" do
+    session = Session.new(20, 5)
+
+    widgets = [
+      {%TextInput{state: {"world", 5, 0}}, %Rect{x: 0, y: 0, width: 20, height: 1}},
+      {%Textarea{state: {"abc\ndef", 1, 2}}, %Rect{x: 0, y: 1, width: 20, height: 4}}
+    ]
+
+    assert :ok = Session.draw(session, widgets)
+    assert byte_size(Session.take_output(session)) > 0
+    Session.close(session)
+  end
+
   test "encode_command supports min, max, and ratio constraints" do
     {widget, _rect} =
       Bridge.encode_command(

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **SSH bare Esc key not detected** — VTE's state machine swallows `0x1B` as the start of an escape sequence, so a bare Esc press over SSH produced no event. The SSH transport now schedules a 50 ms timeout after a lone `0x1B` with no follow-up bytes; if the timer fires it resets the parser and dispatches a synthetic `%Event.Key{code: "esc"}` press. Follow-up bytes (the normal case for multi-byte sequences like arrow keys) cancel the timer before it fires. Added `Session.reset_parser/1` and its backing `session_reset_parser` NIF
+- **Distributed transport crashes on stateful widgets** — `TextInput` and `Textarea` store their mutable state in NIF resource references that cannot cross BEAM node boundaries via Erlang distribution. The distributed server now snapshots stateful widget state into plain tuples before sending, and the Rust decoder reconstructs temporary resources from the snapshot on the client node. Stateless widgets are unaffected. Added `text_input_snapshot` and `textarea_snapshot` NIFs
 
 ## [0.7.0] - 2026-04-13
 

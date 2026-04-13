@@ -9,7 +9,7 @@ use crate::decode::{
 use crate::layout::decode_constraint;
 use crate::style::decode_style;
 use crate::terminal::{with_terminal_draw, TerminalResource};
-use crate::text_input::{self, TextInputRenderData, TextInputResource};
+use crate::text_input::{self, TextInputRenderData, TextInputResource, TextInputState};
 use crate::textarea::{self, TextareaRenderData, TextareaResource};
 use crate::widgets::block::{self, BlockData};
 use crate::widgets::checkbox::{self, CheckboxData};
@@ -381,7 +381,7 @@ fn decode_checkbox(map: &TermMap<'_>) -> Result<CheckboxData, Error> {
 }
 
 fn decode_text_input(map: &TermMap<'_>) -> Result<TextInputRenderData, Error> {
-    let resource: ResourceArc<TextInputResource> = decode_required(map, "state", "text_input")?;
+    let resource = decode_text_input_state(map)?;
 
     let style = match optional_term(map, "style") {
         Some(term) => decode_style(term)?,
@@ -487,7 +487,7 @@ fn decode_markdown(map: &TermMap<'_>) -> Result<MarkdownData, Error> {
 }
 
 fn decode_textarea(map: &TermMap<'_>) -> Result<TextareaRenderData, Error> {
-    let resource: ResourceArc<TextareaResource> = decode_required(map, "state", "textarea")?;
+    let resource = decode_textarea_state(map)?;
 
     let style = match optional_term(map, "style") {
         Some(term) => decode_style(term)?,
@@ -630,5 +630,64 @@ pub fn render_widget_data(buf: &mut Buffer, widget: &WidgetData, area: Rect) {
         WidgetData::Popup(data) => popup::render(buf, data, area),
         WidgetData::WidgetList(data) => widget_list::render(buf, data, area),
         WidgetData::Clear => crate::widgets::clear::render(buf, area),
+    }
+}
+
+/// Decodes the `"state"` field for a TextInput widget.
+///
+/// Accepts either a `ResourceArc<TextInputResource>` (local rendering) or a
+/// `{value, cursor, viewport_offset}` snapshot tuple (distributed rendering
+/// where the NIF reference could not cross the node boundary). When a snapshot
+/// is received, a temporary `ResourceArc` is constructed so the rest of the
+/// decode + render pipeline stays uniform.
+fn decode_text_input_state(map: &TermMap<'_>) -> Result<ResourceArc<TextInputResource>, Error> {
+    match map.get("state").copied() {
+        Some(term) => {
+            // Fast path: local NIF reference.
+            if let Ok(resource) = term.decode::<ResourceArc<TextInputResource>>() {
+                return Ok(resource);
+            }
+            // Distributed snapshot: {value, cursor, viewport_offset}.
+            let (value, cursor, viewport_offset): (String, usize, usize) = term
+                .decode()
+                .map_err(|_| invalid_field("text_input", "state", "unexpected value"))?;
+            Ok(ResourceArc::new(TextInputResource {
+                state: std::sync::Mutex::new(TextInputState {
+                    value,
+                    cursor,
+                    viewport_offset,
+                }),
+            }))
+        }
+        None => Err(crate::decode::missing_field("text_input", "state")),
+    }
+}
+
+/// Decodes the `"state"` field for a Textarea widget.
+///
+/// Same dual-path logic as `decode_text_input_state`: accepts a
+/// `ResourceArc<TextareaResource>` or a `{value, cursor_row, cursor_col}`
+/// snapshot tuple. The snapshot path creates a fresh `TextArea`, sets its
+/// text content, and positions the cursor via `CursorMove::Jump`.
+fn decode_textarea_state(map: &TermMap<'_>) -> Result<ResourceArc<TextareaResource>, Error> {
+    match map.get("state").copied() {
+        Some(term) => {
+            if let Ok(resource) = term.decode::<ResourceArc<TextareaResource>>() {
+                return Ok(resource);
+            }
+            let (value, cursor_row, cursor_col): (String, usize, usize) = term
+                .decode()
+                .map_err(|_| invalid_field("textarea", "state", "unexpected value"))?;
+            let lines: Vec<String> = value.split('\n').map(|s| s.to_string()).collect();
+            let mut textarea = ratatui_textarea::TextArea::new(lines);
+            textarea.move_cursor(ratatui_textarea::CursorMove::Jump(
+                cursor_row as u16,
+                cursor_col as u16,
+            ));
+            Ok(ResourceArc::new(TextareaResource {
+                state: std::sync::Mutex::new(textarea),
+            }))
+        }
+        None => Err(crate::decode::missing_field("textarea", "state")),
     }
 }

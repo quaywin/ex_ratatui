@@ -167,7 +167,8 @@ defmodule ExRatatui.Bridge do
     raise ArgumentError, "text_input.state is required and must be a reference"
   end
 
-  defp encode_widget(%TextInput{state: state}) when not is_reference(state) do
+  defp encode_widget(%TextInput{state: state})
+       when not is_reference(state) and not is_tuple(state) do
     raise ArgumentError,
           "text_input.state is required and must be a reference, got: #{inspect(state)}"
   end
@@ -201,7 +202,8 @@ defmodule ExRatatui.Bridge do
     raise ArgumentError, "textarea.state is required and must be a reference"
   end
 
-  defp encode_widget(%Textarea{state: state}) when not is_reference(state) do
+  defp encode_widget(%Textarea{state: state})
+       when not is_reference(state) and not is_tuple(state) do
     raise ArgumentError,
           "textarea.state is required and must be a reference, got: #{inspect(state)}"
   end

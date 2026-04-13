@@ -330,6 +330,68 @@ defmodule ExRatatui.SessionTest do
     end
   end
 
+  describe "text_input_snapshot/1 and textarea_snapshot/1" do
+    test "text_input_snapshot returns {value, cursor, viewport_offset}" do
+      ref = Native.text_input_new()
+      Native.text_input_set_value(ref, "hello")
+      # set_value places cursor at end (5) and resets viewport_offset to 0
+      assert {"hello", 5, 0} = Native.text_input_snapshot(ref)
+    end
+
+    test "text_input_snapshot reflects cursor movement" do
+      ref = Native.text_input_new()
+      Native.text_input_handle_key(ref, "a")
+      Native.text_input_handle_key(ref, "b")
+      Native.text_input_handle_key(ref, "left")
+      assert {"ab", 1, 0} = Native.text_input_snapshot(ref)
+    end
+
+    test "textarea_snapshot returns {value, cursor_row, cursor_col}" do
+      ref = Native.textarea_new()
+      Native.textarea_set_value(ref, "line1\nline2")
+      # set_value reconstructs the TextArea — cursor at (0, 0)
+      assert {"line1\nline2", 0, 0} = Native.textarea_snapshot(ref)
+    end
+
+    test "textarea_snapshot reflects cursor movement after typing" do
+      ref = Native.textarea_new()
+      Native.textarea_handle_key(ref, "h", [])
+      Native.textarea_handle_key(ref, "i", [])
+      assert {"hi", 0, 2} = Native.textarea_snapshot(ref)
+    end
+  end
+
+  describe "snapshot-based rendering (distributed path)" do
+    test "session_draw renders a TextInput from a snapshot tuple" do
+      ref = Native.session_new(20, 1)
+
+      # Snapshot tuple: {value, cursor, viewport_offset}
+      commands = [
+        {%{"type" => "text_input", "state" => {"hello", 5, 0}},
+         %{"x" => 0, "y" => 0, "width" => 20, "height" => 1}}
+      ]
+
+      assert :ok = Native.session_draw(ref, commands)
+      assert byte_size(Native.session_take_output(ref)) > 0
+
+      :ok = Native.session_close(ref)
+    end
+
+    test "session_draw renders a Textarea from a snapshot tuple" do
+      ref = Native.session_new(20, 5)
+
+      commands = [
+        {%{"type" => "textarea", "state" => {"line1\nline2", 0, 0}},
+         %{"x" => 0, "y" => 0, "width" => 20, "height" => 5}}
+      ]
+
+      assert :ok = Native.session_draw(ref, commands)
+      assert byte_size(Native.session_take_output(ref)) > 0
+
+      :ok = Native.session_close(ref)
+    end
+  end
+
   describe "ExRatatui.Session (Elixir wrapper)" do
     alias ExRatatui.Event
     alias ExRatatui.Layout.Rect

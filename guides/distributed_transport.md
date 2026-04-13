@@ -93,9 +93,15 @@ iex> ExRatatui.Distributed.attach(:"app@hostname", SystemMonitor)
 
 All messages are plain BEAM terms sent via `send/2` — no encoding, no NIF, no serialization overhead.
 
-### No NIF on the App Node
+### Stateful Widget Handling
 
-The distributed transport is unique: the app node never loads the Rust NIF. Widget structs (e.g. `%Paragraph{}`, `%Table{}`) are standard Elixir structs that serialize naturally over Erlang distribution. The client node renders them locally using its own `TerminalResource`. This makes the app node lightweight — ideal for constrained environments like Nerves devices.
+Most widgets (Paragraph, Table, List, etc.) are pure Elixir structs that serialize naturally over Erlang distribution. However, **stateful widgets** — `TextInput` and `Textarea` — store their mutable state (text value, cursor position, viewport offset) in a NIF resource reference, a pointer into Rust memory on the local node. NIF references cannot cross BEAM node boundaries.
+
+The distributed server handles this transparently: before sending a widget list, it snapshots each stateful widget's NIF state into a plain tuple (`{value, cursor, viewport_offset}` for TextInput, `{value, cursor_row, cursor_col}` for Textarea) and replaces the reference in the struct. On the client node, the Rust decoder recognizes the snapshot form and reconstructs a temporary resource for rendering. This happens automatically — app code doesn't need to do anything special.
+
+### No NIF on the App Node (for stateless widgets)
+
+For apps that only use stateless widgets (Paragraph, Table, List, etc.), the app node never loads the Rust NIF — widget structs are standard Elixir terms that serialize directly. When using stateful widgets (TextInput, Textarea), the app node does load the NIF to manage their mutable state, but the rendering NIF is still only loaded on the client side. This makes the app node lightweight — ideal for constrained environments like Nerves devices.
 
 ## Options
 

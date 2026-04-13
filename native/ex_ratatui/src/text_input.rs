@@ -17,9 +17,9 @@ mod atoms {
 }
 
 pub struct TextInputState {
-    value: String,
-    cursor: usize,
-    viewport_offset: usize,
+    pub(crate) value: String,
+    pub(crate) cursor: usize,
+    pub(crate) viewport_offset: usize,
 }
 
 impl TextInputState {
@@ -144,6 +144,17 @@ fn text_input_cursor(resource: ResourceArc<TextInputResource>) -> Result<usize, 
         .lock()
         .map_err(|_| Error::Term(Box::new("text_input lock poisoned")))?;
     Ok(state.cursor)
+}
+
+#[rustler::nif]
+fn text_input_snapshot(
+    resource: ResourceArc<TextInputResource>,
+) -> Result<(String, usize, usize), Error> {
+    let state = resource
+        .state
+        .lock()
+        .map_err(|_| Error::Term(Box::new("text_input lock poisoned")))?;
+    Ok((state.value.clone(), state.cursor, state.viewport_offset))
 }
 
 // -- Rendering --
