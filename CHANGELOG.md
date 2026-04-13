@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-13
+
 ### Added
 
 - **Reducer runtime** for `ExRatatui.App` via `use ExRatatui.App, runtime: :reducer`. Reducer apps implement `init/1`, `render/2`, and `update/2`, receive terminal input as `{:event, event}`, mailbox messages as `{:info, msg}`, and can declare subscriptions with `subscriptions/1`
@@ -272,7 +274,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/mcass19/ex_ratatui/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/mcass19/ex_ratatui/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/mcass19/ex_ratatui/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/mcass19/ex_ratatui/compare/v0.5.1...v0.6.0
