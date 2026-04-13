@@ -107,6 +107,18 @@ The distributed transport is unique: the app node never loads the Rust NIF. Widg
 | `:name` | `atom() \| nil` | `ExRatatui.Distributed.Listener` | Registered name, or `nil` to skip |
 | `:app_opts` | `keyword()` | `[]` | Extra opts merged into every client's `mount/1` call |
 
+Running multiple Listeners in the same supervision tree requires distinct `:name` values — the default (`ExRatatui.Distributed.Listener`) would collide on the second instance. Pass the matching name as the `:listener` option when attaching:
+
+```elixir
+children = [
+  {ExRatatui.Distributed.Listener, mod: AdminTui},                                      # default name
+  {ExRatatui.Distributed.Listener, mod: StatsTui, name: :stats_dist}                     # explicit name
+]
+
+# Attaching clients must match the listener name:
+ExRatatui.Distributed.attach(:"app@host", StatsTui, listener: :stats_dist)
+```
+
 ### `ExRatatui.Distributed.attach/3`
 
 | Option | Type | Default | Description |
@@ -222,6 +234,11 @@ The integration tests exercise the full roundtrip: mount on a peer node, render,
 
 **Widgets render differently on client vs server**
 : The client renders with its own NIF, which must be the same ExRatatui version as the server. Mismatched versions may produce different widget struct shapes.
+
+## Examples
+
+  * [`phoenix_ex_ratatui_example`](https://github.com/mcass19/phoenix_ex_ratatui_example) — Phoenix app with two TUIs (callback and reducer runtime) attached over distribution from any named BEAM node on the network
+  * [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) — Nerves firmware with three TUIs attached over distribution from a dev machine to a Raspberry Pi
 
 ## Related
 

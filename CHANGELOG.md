@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The internal server now supports reducer runtime options for commands, render suppression, trace state, runtime snapshots, async command tracking, and subscription reconciliation
 - Render-command encoding moved into `ExRatatui.Bridge`, making `ExRatatui.draw/2` and `ExRatatui.Session.draw/2` share one validation and encoding path
 - Native render-command decoding was refactored into reusable helpers in `native/ex_ratatui/src/decode.rs` and shared between local terminal rendering and session rendering
+- Bumped `ratatui-textarea` Rust dependency from 0.8 to 0.9
+- `credo` dependency restricted to `:dev` environment only
 
 ### Fixed
 
@@ -37,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Docs
 
+- Extracted runtime and widget content from README into dedicated guides: `guides/callback_runtime.md`, `guides/reducer_runtime.md`, and `guides/building_uis.md`
+- Added widget cheatsheet: `guides/cheatsheets/widgets.cheatmd`
 - README now documents the reducer runtime, reducer example app, command/subscription helpers, and runtime inspection API
 - README and `ExRatatui.App` docs now call out that `mount/1` may return runtime opts and that `WidgetList.scroll_offset` is row-based with partial clipping semantics
 - Expanded public moduledocs for `ExRatatui.App`, `ExRatatui.Command`, `ExRatatui.Subscription`, and `ExRatatui.Runtime`

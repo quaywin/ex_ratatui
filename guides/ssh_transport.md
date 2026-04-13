@@ -133,7 +133,7 @@ ssh -t nerves.local -s Elixir.MyApp.TUI
 ssh nerves.local -s Elixir.MyApp.TUI
 ```
 
-See the [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) project for an end-to-end Nerves firmware that wires two TUIs into a `nerves_ssh` daemon and runs them on a Raspberry Pi.
+See the [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) project for an end-to-end Nerves firmware that wires three TUIs (callback and reducer runtime) into a `nerves_ssh` daemon and runs them on a Raspberry Pi.
 
 ## Options Reference
 
@@ -161,6 +161,19 @@ Everything else is forwarded verbatim to `:ssh.daemon/2`, so all of OTP's `:ssh`
   * `:profile` — multiple daemons on the same machine
 
 See the `:ssh.daemon/2` [OTP docs](https://www.erlang.org/doc/apps/ssh/ssh.html#daemon/2) for the full list.
+
+### Multiple Daemons
+
+Running two or more SSH daemons in the same supervision tree requires distinct `:name` values — the default (`ExRatatui.SSH.Daemon`) is a single global atom, so a second daemon will crash with "already started". Give each daemon its own name and port:
+
+```elixir
+children = [
+  {AdminTui, transport: :ssh, port: 2222},                                    # name defaults to ExRatatui.SSH.Daemon
+  {StatsTui, transport: :ssh, port: 2223, name: :stats_ssh_daemon}             # explicit name avoids collision
+]
+```
+
+On Nerves, prefer registering multiple TUIs as subsystems on a single `nerves_ssh` daemon instead of running separate daemons — see the ["Integration with `nerves_ssh`"](#integration-with-nerves_ssh) section.
 
 ### Why `charlist()` everywhere?
 

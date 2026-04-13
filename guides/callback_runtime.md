@@ -212,8 +212,8 @@ end
   * [`examples/counter_app.exs`](https://github.com/mcass19/ex_ratatui/blob/main/examples/counter_app.exs) — simple counter with key events
   * [`examples/system_monitor.exs`](https://github.com/mcass19/ex_ratatui/blob/main/examples/system_monitor.exs) — Linux system dashboard with CPU, memory, disk, network, and BEAM stats (also runs over SSH and Erlang distribution)
   * [`examples/task_manager/`](https://github.com/mcass19/ex_ratatui/tree/main/examples/task_manager) — supervised Ecto + SQLite CRUD app with tabs, table, scrollbar, and SSH support
-  * [`phoenix_ex_ratatui_example`](https://github.com/mcass19/phoenix_ex_ratatui_example) — Phoenix 1.8 app with an admin TUI over SSH sharing PubSub with LiveView
-  * [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) — Nerves firmware with system monitor and LED control TUIs over SSH
+  * [`phoenix_ex_ratatui_example`](https://github.com/mcass19/phoenix_ex_ratatui_example) — Phoenix app with an admin TUI over SSH and Erlang distribution, sharing PubSub with LiveView (also includes a [reducer-runtime TUI](https://github.com/mcass19/phoenix_ex_ratatui_example/blob/main/lib/phoenix_ex_ratatui_example/stats_reducer_tui.ex))
+  * [`nerves_ex_ratatui_example`](https://github.com/mcass19/nerves_ex_ratatui_example) — Nerves firmware with system monitor and LED control TUIs over SSH subsystems and Erlang distribution (also includes a [reducer-runtime system monitor](https://github.com/mcass19/nerves_ex_ratatui_example/blob/main/lib/system_monitor_reducer_tui.ex))
 
 ## Related
 
