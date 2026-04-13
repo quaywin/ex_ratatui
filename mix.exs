@@ -70,6 +70,7 @@ defmodule ExRatatui.MixProject do
 
       # Dev
       {:ex_doc, "~> 0.35", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
   end
@@ -100,12 +101,19 @@ defmodule ExRatatui.MixProject do
         "CONTRIBUTING.md": [title: "Contributing"],
         "CHANGELOG.md": [title: "Changelog"]
       ],
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
+      skip_code_autolink_to: &skip_docs_autolink?/1,
       groups_for_extras: [
         Guides: Path.wildcard("guides/*.md")
       ],
       groups_for_modules: [
         Application: [
           ExRatatui.App
+        ],
+        "Reducer Runtime": [
+          ExRatatui.Command,
+          ExRatatui.Subscription,
+          ExRatatui.Runtime
         ],
         "SSH Transport": [
           ExRatatui.Session,
@@ -152,5 +160,10 @@ defmodule ExRatatui.MixProject do
         ]
       ]
     ]
+  end
+
+  defp skip_docs_autolink?(term) do
+    String.match?(term, ~r/^ExRatatui\.(Native|Server)(\.|$)/) or
+      term == ":ssh_connection.handle_cli_msg/3"
   end
 end

@@ -2,6 +2,7 @@ defmodule ExRatatui.ServerTest do
   use ExUnit.Case, async: true
 
   alias ExRatatui.Frame
+  alias ExRatatui.Runtime
 
   defmodule TestApp do
     use ExRatatui.App
@@ -65,8 +66,8 @@ defmodule ExRatatui.ServerTest do
   defmodule RenderingApp do
     use ExRatatui.App
 
-    alias ExRatatui.Widgets.Paragraph
     alias ExRatatui.Layout.Rect
+    alias ExRatatui.Widgets.Paragraph
 
     @impl true
     def mount(opts) do
@@ -111,8 +112,8 @@ defmodule ExRatatui.ServerTest do
   defmodule DrawErrorApp do
     use ExRatatui.App
 
-    alias ExRatatui.Widgets.Paragraph
     alias ExRatatui.Layout.Rect
+    alias ExRatatui.Widgets.Paragraph
 
     @impl true
     def mount(opts) do
@@ -392,10 +393,60 @@ defmodule ExRatatui.ServerTest do
     end
   end
 
+  describe "runtime event injection" do
+    test "inject_event/2 drives handle_event for local test servers" do
+      {:ok, pid} =
+        ExRatatui.Server.start_link(
+          mod: TestApp,
+          name: nil,
+          test_pid: self(),
+          test_mode: {80, 24}
+        )
+
+      assert_receive {:mounted, _opts}, 1000
+      assert_receive {:rendered, 0, %Frame{width: 80, height: 24}}, 1000
+
+      event = %ExRatatui.Event.Key{code: "a", modifiers: [], kind: "press"}
+
+      assert :ok = Runtime.inject_event(pid, event)
+      assert_receive {:event, ^event}, 1000
+      assert_receive {:rendered, 0, %Frame{width: 80, height: 24}}, 1000
+
+      GenServer.stop(pid)
+    end
+
+    test "inject_event/2 can stop the server cleanly" do
+      {:ok, pid} =
+        ExRatatui.Server.start_link(
+          mod: StopOnEventApp,
+          name: nil,
+          test_pid: self(),
+          test_mode: {80, 24}
+        )
+
+      ref = Process.monitor(pid)
+
+      assert :ok = Runtime.inject_event(pid, %{stop: true})
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
+    end
+  end
+
   describe "process_poll_result/1" do
     test "stop returns GenServer stop tuple" do
       state = build_server_state(TestApp, %{test_pid: self()})
       assert {:stop, :normal, ^state} = ExRatatui.Server.process_poll_result({:stop, state})
+    end
+
+    test "continue re-arms polling when live input is enabled" do
+      state =
+        build_server_state(TestApp, %{test_pid: self()},
+          test_mode: nil,
+          polling_enabled?: true,
+          poll_interval: 0
+        )
+
+      assert {:noreply, ^state} = ExRatatui.Server.process_poll_result({:continue, state, false})
+      assert_receive :poll, 1000
     end
   end
 
@@ -404,9 +455,18 @@ defmodule ExRatatui.ServerTest do
       assert {80, 24} = ExRatatui.Server.resolve_terminal_size({80, 24})
     end
 
-    test "resolves when nil (falls back to terminal_size or default)" do
+    test "uses the default resolver when dimensions are not explicit" do
       {w, h} = ExRatatui.Server.resolve_terminal_size(nil)
       assert is_integer(w) and is_integer(h)
+    end
+
+    test "uses the injected resolver when dimensions are not explicit" do
+      assert {145, 30} = ExRatatui.Server.resolve_terminal_size(nil, fn -> {145, 30} end)
+    end
+
+    test "falls back to 80x24 when the injected resolver errors" do
+      assert {80, 24} =
+               ExRatatui.Server.resolve_terminal_size(nil, fn -> {:error, "no tty"} end)
     end
   end
 
@@ -424,6 +484,43 @@ defmodule ExRatatui.ServerTest do
     test "returns stop when terminal init failed" do
       assert {:stop, {:terminal_init_failed, "no tty"}} =
                ExRatatui.Server.continue_init({:error, "no tty"}, [])
+    end
+
+    test "enables polling for live local servers" do
+      assert {:ok, state} =
+               ExRatatui.Server.continue_init(make_ref(),
+                 mod: TestApp,
+                 name: nil,
+                 test_pid: self(),
+                 terminal_size_fn: fn -> {80, 24} end
+               )
+
+      assert state.polling_enabled?
+      assert_receive {:mounted, _opts}, 1000
+      assert_receive {:rendered, 0, %Frame{width: 80, height: 24}}, 1000
+      assert_receive :poll, 1000
+    end
+  end
+
+  describe "poll loop handling" do
+    test ":poll is ignored when headless polling is disabled" do
+      state = build_server_state(TestApp, %{test_pid: self()}, polling_enabled?: false)
+      assert {:noreply, ^state} = ExRatatui.Server.handle_info(:poll, state)
+    end
+
+    test ":poll re-arms when live polling is enabled" do
+      state =
+        build_server_state(TestApp, %{test_pid: self()},
+          test_mode: nil,
+          polling_enabled?: true,
+          poll_interval: 0
+        )
+
+      assert {:noreply, %ExRatatui.Server{} = next_state} =
+               ExRatatui.Server.handle_info(:poll, state)
+
+      assert next_state.polling_enabled?
+      assert_receive :poll, 1000
     end
   end
 
@@ -503,20 +600,27 @@ defmodule ExRatatui.ServerTest do
     end
   end
 
-  defp build_server_state(mod, user_state) do
-    %ExRatatui.Server{
-      mod: mod,
-      user_state: user_state,
-      test_mode: {80, 24},
-      terminal_ref: make_ref(),
-      terminal_initialized: true
-    }
+  defp build_server_state(mod, user_state, attrs \\ []) do
+    struct!(
+      ExRatatui.Server,
+      Keyword.merge(
+        [
+          mod: mod,
+          user_state: user_state,
+          test_mode: {80, 24},
+          terminal_ref: make_ref(),
+          terminal_size_fn: fn -> {80, 24} end,
+          terminal_initialized: true
+        ],
+        attrs
+      )
+    )
   end
 
   describe "SSH transport" do
+    alias ExRatatui.Layout.Rect
     alias ExRatatui.Session
     alias ExRatatui.Widgets.Paragraph
-    alias ExRatatui.Layout.Rect
 
     defmodule SshApp do
       use ExRatatui.App
@@ -805,8 +909,8 @@ defmodule ExRatatui.ServerTest do
   end
 
   describe "Distributed server transport" do
-    alias ExRatatui.Widgets.Paragraph
     alias ExRatatui.Layout.Rect
+    alias ExRatatui.Widgets.Paragraph
 
     defmodule DistApp do
       use ExRatatui.App
@@ -875,6 +979,57 @@ defmodule ExRatatui.ServerTest do
       def handle_event(_event, state), do: {:noreply, state}
     end
 
+    defmodule DistReducerApp do
+      use ExRatatui.App, runtime: :reducer
+
+      alias ExRatatui.{Command, Subscription}
+
+      @impl true
+      def init(opts) do
+        test_pid = Keyword.fetch!(opts, :test_pid)
+        send(test_pid, {:reducer_mounted, opts})
+        {:ok, %{test_pid: test_pid, events: []}, commands: [Command.message(:boot)]}
+      end
+
+      @impl true
+      def render(state, frame) do
+        ordered_events = Enum.reverse(state.events)
+        send(state.test_pid, {:reducer_rendered, ordered_events, frame})
+
+        [
+          {%Paragraph{text: inspect(ordered_events)},
+           %Rect{x: 0, y: 0, width: frame.width, height: frame.height}}
+        ]
+      end
+
+      @impl true
+      def update({:info, :boot}, state) do
+        send(state.test_pid, :boot_seen)
+        {:noreply, %{state | events: [:boot | state.events]}}
+      end
+
+      def update({:info, :tick}, state) do
+        send(state.test_pid, :tick_seen)
+        {:noreply, %{state | events: [:tick | state.events]}}
+      end
+
+      def update({:event, %ExRatatui.Event.Key{} = event}, state) do
+        send(state.test_pid, {:reducer_event, event})
+        {:noreply, %{state | events: [{:event, event.code} | state.events]}}
+      end
+
+      def update(_msg, state), do: {:noreply, state}
+
+      @impl true
+      def subscriptions(%{events: events}) do
+        if Enum.member?(events, :boot) and not Enum.member?(events, :tick) do
+          [Subscription.once(:after_boot, 10, :tick)]
+        else
+          []
+        end
+      end
+    end
+
     test "start_link with {:distributed_server, ...} mounts and sends widgets to client" do
       {:ok, pid} =
         ExRatatui.Server.start_link(
@@ -897,6 +1052,67 @@ defmodule ExRatatui.ServerTest do
 
       GenServer.stop(pid)
       assert_receive {:terminated, :normal}, 1000
+    end
+
+    test "reducer apps run over {:distributed_server, ...} with commands, subscriptions, and events" do
+      {:ok, pid} =
+        ExRatatui.Server.start_link(
+          mod: DistReducerApp,
+          name: nil,
+          test_pid: self(),
+          transport: {:distributed_server, self(), 40, 10}
+        )
+
+      assert_receive {:reducer_mounted, opts}, 1000
+      assert opts[:transport] == :distributed
+      assert opts[:width] == 40
+      assert opts[:height] == 10
+
+      assert_receive {:reducer_rendered, [], %Frame{width: 40, height: 10}}, 1000
+      assert_receive {:ex_ratatui_draw, initial_widgets}, 1000
+
+      assert [{%Paragraph{text: "[]"}, %Rect{x: 0, y: 0, width: 40, height: 10}}] =
+               initial_widgets
+
+      assert_receive :boot_seen, 1000
+      assert_receive {:reducer_rendered, [:boot], %Frame{width: 40, height: 10}}, 1000
+      assert_receive {:ex_ratatui_draw, boot_widgets}, 1000
+
+      assert [{%Paragraph{text: "[:boot]"}, %Rect{x: 0, y: 0, width: 40, height: 10}}] =
+               boot_widgets
+
+      assert_receive :tick_seen, 1000
+      assert_receive {:reducer_rendered, [:boot, :tick], %Frame{width: 40, height: 10}}, 1000
+
+      assert_receive {:ex_ratatui_draw, tick_widgets}, 1000
+
+      assert [{%Paragraph{text: "[:boot, :tick]"}, %Rect{x: 0, y: 0, width: 40, height: 10}}] =
+               tick_widgets
+
+      event = %ExRatatui.Event.Key{code: "x", modifiers: [], kind: "press"}
+      send(pid, {:ex_ratatui_event, event})
+
+      assert_receive {:reducer_event, ^event}, 1000
+
+      assert_receive {:reducer_rendered, [:boot, :tick, {:event, "x"}],
+                      %Frame{width: 40, height: 10}},
+                     1000
+
+      assert_receive {:ex_ratatui_draw, event_widgets}, 1000
+
+      assert [
+               {%Paragraph{text: "[:boot, :tick, {:event, \"x\"}]"},
+                %Rect{x: 0, y: 0, width: 40, height: 10}}
+             ] = event_widgets
+
+      snapshot = Runtime.snapshot(pid)
+      assert snapshot.mode == :reducer
+      assert snapshot.transport == :distributed_server
+      refute snapshot.polling_enabled?
+      assert snapshot.subscription_count == 0
+      assert snapshot.active_async_commands == 0
+
+      GenServer.stop(pid)
     end
 
     test "{:ex_ratatui_event, event} drives handle_event and re-renders" do
