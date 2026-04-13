@@ -23,6 +23,7 @@ defmodule ExRatatui.Native do
     session_draw: 2,
     session_take_output: 1,
     session_feed_input: 2,
+    session_reset_parser: 1,
     session_resize: 3,
     session_size: 1,
     textarea_new: 0,

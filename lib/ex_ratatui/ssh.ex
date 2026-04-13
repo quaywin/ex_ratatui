@@ -159,6 +159,13 @@ defmodule ExRatatui.SSH do
   # teardown.
   @leave_screen "\e[?1049l\e[?25h\e[0m"
 
+  # Bare-Esc detection timeout (milliseconds). VTE's state machine
+  # swallows 0x1B as the start of an escape sequence; if no follow-up
+  # byte arrives within this window we emit a synthetic Esc press.
+  # 50 ms is well above the ~1 ms inter-byte gap of escape sequences
+  # but below the human perception threshold.
+  @esc_timeout_ms 50
+
   defstruct [
     :mod,
     :app_opts,
@@ -170,7 +177,8 @@ defmodule ExRatatui.SSH do
     :replier,
     :starter,
     rendering: false,
-    subsystem_mode: false
+    subsystem_mode: false,
+    esc_timer: nil
   ]
 
   @type t :: %__MODULE__{
@@ -184,7 +192,8 @@ defmodule ExRatatui.SSH do
           replier: (term(), boolean(), :success | :failure, non_neg_integer() -> :ok),
           starter: (keyword() -> {:ok, pid()} | {:error, term()}),
           rendering: boolean(),
-          subsystem_mode: boolean()
+          subsystem_mode: boolean(),
+          esc_timer: reference() | nil
         }
 
   @doc """
@@ -284,6 +293,25 @@ defmodule ExRatatui.SSH do
     {:ok, %{state | channel_id: channel_id, conn: conn}}
   end
 
+  def handle_msg(
+        :esc_timeout,
+        %__MODULE__{session: %Session{} = session, server_pid: server_pid} = state
+      )
+      when is_pid(server_pid) do
+    # The Esc timeout fired — no follow-up byte arrived after a bare
+    # 0x1B, so this was a genuine Esc press. Reset the parser to Ground
+    # (clearing the stuck Escape state) and dispatch a synthetic Esc event.
+    Session.reset_parser(session)
+    esc_event = %Event.Key{code: "esc", modifiers: [], kind: "press"}
+    dispatch_input_event(esc_event, session, server_pid)
+    {:ok, %{state | esc_timer: nil}}
+  end
+
+  def handle_msg(:esc_timeout, state) do
+    # Timer fired but no active session/server — just clear it.
+    {:ok, %{state | esc_timer: nil}}
+  end
+
   def handle_msg({:EXIT, pid, _reason}, %__MODULE__{server_pid: pid, channel_id: id} = state) do
     # Our linked Server died (normal or crash). Flush the leave-screen
     # sequence *now*, while the channel is still writable — by the time
@@ -356,9 +384,24 @@ defmodule ExRatatui.SSH do
         %__MODULE__{session: %Session{} = session, server_pid: server_pid} = state
       )
       when is_pid(server_pid) do
-    session
-    |> Session.feed_input(data)
-    |> Enum.each(&dispatch_input_event(&1, session, server_pid))
+    # Cancel any pending Esc timer — new data arrived, so the previous
+    # 0x1B was part of an escape sequence, not a bare Esc press.
+    state = cancel_esc_timer(state)
+
+    events = Session.feed_input(session, data)
+    Enum.each(events, &dispatch_input_event(&1, session, server_pid))
+
+    # If the parser consumed bytes but produced no events, the VTE
+    # state machine may be sitting in the Escape state after a bare
+    # 0x1B. Schedule a short timeout — if no follow-up byte arrives
+    # the timer fires and we emit a synthetic Esc press.
+    state =
+      if events == [] and byte_size(data) > 0 and :binary.match(data, <<0x1B>>) != :nomatch do
+        ref = Process.send_after(self(), :esc_timeout, @esc_timeout_ms)
+        %{state | esc_timer: ref}
+      else
+        state
+      end
 
     {:ok, state}
   end
@@ -502,6 +545,20 @@ defmodule ExRatatui.SSH do
 
   defp maybe_close_session(nil), do: :ok
   defp maybe_close_session(%Session{} = session), do: Session.close(session)
+
+  defp cancel_esc_timer(%__MODULE__{esc_timer: nil} = state), do: state
+
+  defp cancel_esc_timer(%__MODULE__{esc_timer: ref} = state) do
+    Process.cancel_timer(ref)
+    # Flush a possible already-delivered :esc_timeout from the mailbox
+    receive do
+      :esc_timeout -> :ok
+    after
+      0 -> :ok
+    end
+
+    %{state | esc_timer: nil}
+  end
 
   defp maybe_leave_screen(%__MODULE__{rendering: false}), do: :ok
 

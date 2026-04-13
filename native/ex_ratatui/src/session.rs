@@ -247,6 +247,18 @@ impl SessionResource {
         parser.feed(bytes, &mut events);
         Ok(events)
     }
+
+    /// Replaces the input parser with a fresh one, discarding any
+    /// partial escape sequence. Used after an Esc timeout to unstick
+    /// the VTE state machine from the Escape state.
+    pub fn reset_parser(&self) -> Result<(), String> {
+        let mut parser = self
+            .input
+            .lock()
+            .map_err(|_| "session input lock poisoned".to_string())?;
+        *parser = InputParser::new();
+        Ok(())
+    }
 }
 
 /// Converts a domain error string into a `rustler::Error::Term` carrying a
@@ -280,6 +292,12 @@ fn session_feed_input(
     bytes: Binary<'_>,
 ) -> Result<Vec<NifEvent>, Error> {
     resource.feed_input(bytes.as_slice()).map_err(nif_error)
+}
+
+#[rustler::nif]
+fn session_reset_parser(resource: ResourceArc<SessionResource>) -> Result<Atom, Error> {
+    resource.reset_parser().map_err(nif_error)?;
+    Ok(atoms::ok())
 }
 
 #[rustler::nif]

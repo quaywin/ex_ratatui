@@ -1,6 +1,8 @@
 defmodule ExRatatui.SessionTest do
   use ExUnit.Case, async: true
 
+  doctest ExRatatui.Session
+
   alias ExRatatui.Native
 
   describe "session_new/2" do
@@ -420,6 +422,23 @@ defmodule ExRatatui.SessionTest do
 
       assert {:error, reason} = Session.resize(session, 40, 10)
       assert reason =~ "closed"
+    end
+
+    test "reset_parser/1 discards a buffered partial escape sequence" do
+      session = Session.new(20, 5)
+
+      # Feed a bare ESC — the parser holds it as the start of an escape.
+      assert [] = Session.feed_input(session, "\e")
+
+      # Reset drops the buffered ESC, returning the parser to Ground.
+      assert :ok = Session.reset_parser(session)
+
+      # The next byte is parsed as a fresh keystroke, NOT as a
+      # continuation of the discarded escape sequence.
+      assert [%Event.Key{code: "a", modifiers: [], kind: "press"}] =
+               Session.feed_input(session, "a")
+
+      :ok = Session.close(session)
     end
 
     test "close/1 is idempotent" do

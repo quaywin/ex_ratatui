@@ -408,6 +408,142 @@ defmodule ExRatatui.SSHTest do
     end
   end
 
+  describe "bare Esc detection" do
+    test "a bare 0x1B with no follow-up schedules the esc timer" do
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      state =
+        build_state()
+        |> Map.merge(%{
+          session: session,
+          server_pid: server,
+          channel_id: 5,
+          conn: :conn
+        })
+
+      # Feed a lone ESC byte — the VTE parser buffers it (no events).
+      data_msg = {:ssh_cm, :conn, {:data, 5, 0, <<0x1B>>}}
+      assert {:ok, new_state} = SSH.handle_ssh_msg(data_msg, state)
+
+      assert is_reference(new_state.esc_timer)
+      # No events dispatched yet — the timer hasn't fired.
+      refute_receive {:server_got, {:ex_ratatui_event, _}}
+
+      Session.close(session)
+      GenServer.stop(server)
+    end
+
+    test "esc_timeout fires a synthetic Esc press and resets the parser" do
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      # Put the parser in the Escape state by feeding a bare 0x1B.
+      [] = Session.feed_input(session, <<0x1B>>)
+
+      state =
+        build_state()
+        |> Map.merge(%{
+          session: session,
+          server_pid: server,
+          channel_id: 5,
+          conn: :conn,
+          esc_timer: make_ref()
+        })
+
+      assert {:ok, new_state} = SSH.handle_msg(:esc_timeout, state)
+      assert new_state.esc_timer == nil
+
+      assert_receive {:server_got,
+                      {:ex_ratatui_event,
+                       %ExRatatui.Event.Key{code: "esc", modifiers: [], kind: "press"}}}
+
+      # The parser was reset — the next byte is parsed from Ground,
+      # not as a continuation of the old escape sequence.
+      [%ExRatatui.Event.Key{code: "a"}] = Session.feed_input(session, "a")
+
+      Session.close(session)
+      GenServer.stop(server)
+    end
+
+    test "esc_timeout without active session/server just clears the timer" do
+      state = build_state() |> Map.merge(%{esc_timer: make_ref()})
+
+      assert {:ok, new_state} = SSH.handle_msg(:esc_timeout, state)
+      assert new_state.esc_timer == nil
+    end
+
+    test "follow-up data flushes an already-delivered esc_timeout from the mailbox" do
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      # Use a 0 ms timer so it fires immediately and lands in the
+      # mailbox before the next handle_ssh_msg call.
+      timer_ref = Process.send_after(self(), :esc_timeout, 0)
+      # Give the timer time to deliver.
+      Process.sleep(5)
+
+      state =
+        build_state()
+        |> Map.merge(%{
+          session: session,
+          server_pid: server,
+          channel_id: 5,
+          conn: :conn,
+          esc_timer: timer_ref
+        })
+
+      # Feed a regular keystroke — cancel_esc_timer must flush the
+      # already-delivered :esc_timeout from the mailbox.
+      data_msg = {:ssh_cm, :conn, {:data, 5, 0, "x"}}
+      assert {:ok, new_state} = SSH.handle_ssh_msg(data_msg, state)
+
+      assert new_state.esc_timer == nil
+      # The stale :esc_timeout was consumed inside cancel_esc_timer,
+      # not left dangling in the mailbox.
+      refute_receive :esc_timeout
+
+      Session.close(session)
+      GenServer.stop(server)
+    end
+
+    test "follow-up data cancels a pending esc timer" do
+      {:ok, server} = __MODULE__.FakeServer.start_link()
+      session = Session.new(80, 24)
+
+      # Simulate: bare ESC was fed, timer is pending.
+      [] = Session.feed_input(session, <<0x1B>>)
+      timer_ref = Process.send_after(self(), :esc_timeout, 60_000)
+
+      state =
+        build_state()
+        |> Map.merge(%{
+          session: session,
+          server_pid: server,
+          channel_id: 5,
+          conn: :conn,
+          esc_timer: timer_ref
+        })
+
+      # Feed "[A" — completes the CSI Up arrow sequence.
+      data_msg = {:ssh_cm, :conn, {:data, 5, 0, "[A"}}
+      assert {:ok, new_state} = SSH.handle_ssh_msg(data_msg, state)
+
+      # Timer was cancelled.
+      assert new_state.esc_timer == nil
+      # The Up arrow event was dispatched.
+      assert_receive {:server_got,
+                      {:ex_ratatui_event,
+                       %ExRatatui.Event.Key{code: "up", modifiers: [], kind: "press"}}}
+
+      # No stale esc_timeout arrives.
+      refute_receive :esc_timeout
+
+      Session.close(session)
+      GenServer.stop(server)
+    end
+  end
+
   describe "dispatch_input_event/3" do
     test "Resize events trigger a session resize + :ex_ratatui_resize to the server" do
       {:ok, server} = __MODULE__.FakeServer.start_link()

@@ -148,6 +148,25 @@ defmodule ExRatatui.Session do
   end
 
   @doc """
+  Resets the session's input parser, discarding any buffered partial
+  escape sequence.
+
+  Used by the SSH transport's Esc timeout: after a bare `0x1B` with no
+  follow-up bytes, the VTE state machine is stuck in the Escape state.
+  Calling this drops that state so the next byte is parsed from Ground.
+
+  ## Examples
+
+      iex> session = ExRatatui.Session.new(20, 5)
+      iex> ExRatatui.Session.reset_parser(session)
+      :ok
+  """
+  @spec reset_parser(t()) :: :ok
+  def reset_parser(%__MODULE__{ref: ref}) do
+    Native.session_reset_parser(ref)
+  end
+
+  @doc """
   Resizes the session's viewport to `width` x `height`.
 
   The next `draw/2` will paint at the new dimensions and the buffer will
