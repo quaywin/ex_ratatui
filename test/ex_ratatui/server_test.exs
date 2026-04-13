@@ -487,11 +487,14 @@ defmodule ExRatatui.ServerTest do
     end
 
     test "enables polling for live local servers" do
+      {:ok, task_sup} = Task.Supervisor.start_link()
+
       assert {:ok, state} =
                ExRatatui.Server.continue_init(make_ref(),
                  mod: TestApp,
                  name: nil,
                  test_pid: self(),
+                 task_supervisor: task_sup,
                  terminal_size_fn: fn -> {80, 24} end
                )
 
@@ -601,6 +604,8 @@ defmodule ExRatatui.ServerTest do
   end
 
   defp build_server_state(mod, user_state, attrs \\ []) do
+    {:ok, task_sup} = Task.Supervisor.start_link()
+
     struct!(
       ExRatatui.Server,
       Keyword.merge(
@@ -610,6 +615,7 @@ defmodule ExRatatui.ServerTest do
           test_mode: {80, 24},
           terminal_ref: make_ref(),
           terminal_size_fn: fn -> {80, 24} end,
+          task_supervisor: task_sup,
           terminal_initialized: true
         ],
         attrs
@@ -901,7 +907,7 @@ defmodule ExRatatui.ServerTest do
       send(pid, :something_to_re_render)
       assert_receive {:rendered, 0, _}, 1000
 
-      Process.sleep(20)
+      _ = :sys.get_state(pid)
       assert Process.alive?(pid)
 
       GenServer.stop(pid)

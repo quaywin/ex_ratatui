@@ -20,6 +20,7 @@ defmodule ExRatatui.Server do
     :session,
     :writer_fn,
     :client_pid,
+    :task_supervisor,
     :width,
     :height,
     polling_enabled?: false,
@@ -56,6 +57,8 @@ defmodule ExRatatui.Server do
   @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
+    {:ok, task_sup} = Task.Supervisor.start_link()
+    opts = Keyword.put(opts, :task_supervisor, task_sup)
 
     case Keyword.get(opts, :transport, :local) do
       :local ->
@@ -92,6 +95,7 @@ defmodule ExRatatui.Server do
           test_mode: test_mode,
           terminal_ref: terminal_ref,
           terminal_size_fn: terminal_size_fn,
+          task_supervisor: Keyword.fetch!(opts, :task_supervisor),
           terminal_initialized: true,
           runtime_mode: runtime_mode(mod)
         }
@@ -134,6 +138,7 @@ defmodule ExRatatui.Server do
           transport: :ssh,
           session: session,
           writer_fn: writer_fn,
+          task_supervisor: Keyword.fetch!(opts, :task_supervisor),
           width: w,
           height: h,
           terminal_initialized: true,
@@ -172,6 +177,7 @@ defmodule ExRatatui.Server do
           user_state: user_state,
           transport: :distributed_server,
           client_pid: client_pid,
+          task_supervisor: Keyword.fetch!(opts, :task_supervisor),
           width: width,
           height: height,
           terminal_initialized: true,
@@ -489,10 +495,9 @@ defmodule ExRatatui.Server do
 
   defp normalize_runtime_opts(runtime_opts) when is_map(runtime_opts) do
     %{
-      commands:
-        Command.normalize(Map.get(runtime_opts, :commands) || Map.get(runtime_opts, "commands")),
-      render?: Map.get(runtime_opts, :render?, Map.get(runtime_opts, "render?", true)),
-      trace?: Map.get(runtime_opts, :trace?, Map.get(runtime_opts, "trace?"))
+      commands: Command.normalize(Map.get(runtime_opts, :commands)),
+      render?: Map.get(runtime_opts, :render?, true),
+      trace?: Map.get(runtime_opts, :trace?)
     }
   end
 
@@ -559,7 +564,7 @@ defmodule ExRatatui.Server do
   defp run_command(%Command{kind: :async, fun: fun, mapper: mapper}, state) do
     parent = self()
 
-    Task.start(fn ->
+    Task.Supervisor.start_child(state.task_supervisor, fn ->
       result = safe_async_result(fun)
       message = safe_async_mapper_result(mapper, result)
       send(parent, {@async_message, message})

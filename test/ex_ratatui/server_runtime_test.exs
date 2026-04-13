@@ -462,6 +462,8 @@ defmodule ExRatatui.ServerRuntimeTest do
   end
 
   defp build_server_state(mod, user_state, attrs \\ []) do
+    {:ok, task_sup} = Task.Supervisor.start_link()
+
     struct(
       Server,
       Keyword.merge(
@@ -471,6 +473,7 @@ defmodule ExRatatui.ServerRuntimeTest do
           runtime_mode: mod.__runtime__(),
           test_mode: {40, 10},
           terminal_ref: make_ref(),
+          task_supervisor: task_sup,
           terminal_initialized: true
         ],
         attrs
