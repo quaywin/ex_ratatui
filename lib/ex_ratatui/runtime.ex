@@ -50,19 +50,32 @@ defmodule ExRatatui.Runtime do
   @doc """
   Enables in-memory runtime tracing for `server`.
 
-  Once enabled, trace events are collected in memory and can be retrieved with
-  `trace_events/1`. Each trace event is a map describing a state transition:
+  Once enabled, trace events are collected in memory and can be retrieved
+  with `trace_events/1`. Each trace event is a map of the form:
 
       %{
-        type: :event | :info | :render | :command | :subscription,
-        timestamp: DateTime.t(),
-        ...
+        kind: :message | :render | :command | :subscription,
+        at_ms: integer(),
+        details: map()
       }
+
+  Where `:at_ms` is the monotonic system time in milliseconds at which the
+  event fired, and `:details` depends on `:kind`:
+
+    * `:message` — `%{source: :event | :info, payload: term()}`. Input
+      events from the terminal arrive as `source: :event`; `handle_info/2`
+      messages (timers, PubSub, etc.) as `source: :info`.
+    * `:render` — `%{frame: ExRatatui.Frame.t(), widget_count: integer()}`.
+    * `:command` — either `%{kind: :message, message: term()}`,
+      `%{kind: :after, delay_ms: integer(), message: term()}`, or
+      `%{kind: :async}` for supervised async commands.
+    * `:subscription` — `%{action: :start | :cancel | :fire, id: term(),
+      kind: atom()}`.
 
   ## Options
 
     * `:limit` — maximum number of recent trace events to retain in memory.
-      Defaults to `200`.
+      Defaults to `200`. Events beyond the limit are dropped oldest-first.
   """
   @spec enable_trace(GenServer.server(), keyword()) :: :ok
   def enable_trace(server, opts \\ []) do
