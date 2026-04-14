@@ -114,10 +114,16 @@ Decorative scrollbar indicator for scrollable content.
 
 ```elixir
 %Scrollbar{
-  orientation: :vertical_right,  # :vertical_right | :vertical_left | :horizontal_bottom | :horizontal_top
+  orientation: :vertical_right,   # :vertical_right | :vertical_left | :horizontal_bottom | :horizontal_top
   content_length: 100,
   position: 25,
-  viewport_content_length: 20
+  viewport_content_length: 20,    # optional, improves thumb sizing
+  thumb_style: %Style{fg: :yellow},
+  track_style: %Style{fg: :dark_gray},
+  thumb_symbol: "█",              # optional, defaults to ratatui's built-in
+  track_symbol: "│",              # optional
+  begin_symbol: "▲",              # optional start-arrow glyph
+  end_symbol: "▼"                 # optional end-arrow glyph
 }
 ```
 

@@ -65,6 +65,52 @@ defmodule ExRatatui.WidgetsTest do
     end
   end
 
+  describe "Paragraph widget" do
+    test "left alignment (default)", %{terminal: terminal} do
+      paragraph = %Paragraph{text: "aligned left", style: %Style{fg: :white}}
+      rect = %Rect{x: 0, y: 0, width: 40, height: 3}
+
+      assert :ok = ExRatatui.draw(terminal, [{paragraph, rect}])
+      assert ExRatatui.get_buffer_content(terminal) =~ "aligned left"
+    end
+
+    test "right alignment", %{terminal: terminal} do
+      paragraph = %Paragraph{text: "right", alignment: :right}
+      rect = %Rect{x: 0, y: 0, width: 40, height: 3}
+
+      assert :ok = ExRatatui.draw(terminal, [{paragraph, rect}])
+      assert ExRatatui.get_buffer_content(terminal) =~ "right"
+    end
+
+    test "word wrap renders long text across multiple rows", %{terminal: terminal} do
+      paragraph = %Paragraph{
+        text: "one two three four five six seven eight nine ten",
+        wrap: true
+      }
+
+      rect = %Rect{x: 0, y: 0, width: 10, height: 6}
+
+      assert :ok = ExRatatui.draw(terminal, [{paragraph, rect}])
+      content = ExRatatui.get_buffer_content(terminal)
+      assert content =~ "one"
+      assert content =~ "ten"
+    end
+
+    test "vertical scroll offset skips rows", %{terminal: terminal} do
+      paragraph = %Paragraph{
+        text: "row1\nrow2\nrow3\nrow4",
+        scroll: {2, 0}
+      }
+
+      rect = %Rect{x: 0, y: 0, width: 20, height: 2}
+
+      assert :ok = ExRatatui.draw(terminal, [{paragraph, rect}])
+      content = ExRatatui.get_buffer_content(terminal)
+      refute content =~ "row1"
+      assert content =~ "row3"
+    end
+  end
+
   describe "Paragraph with block" do
     test "paragraph inside a block", %{terminal: terminal} do
       paragraph = %Paragraph{

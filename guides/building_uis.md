@@ -336,6 +336,8 @@ A vertical list of heterogeneous widgets with optional selection and scrolling. 
 
 `scroll_offset` is a row offset from the top of the content, not an item index. To scroll to a specific item, sum the heights of all preceding items. Items partially above the viewport are clipped row-by-row instead of being dropped entirely.
 
+> **Migrating from v0.6.1 or earlier:** `scroll_offset` used to be an item index. If you were passing `scroll_offset: selected`, convert by summing the heights of all preceding items, e.g. `items |> Enum.take(selected) |> Enum.map(&elem(&1, 1)) |> Enum.sum()`. See the v0.6.2 entry in the [CHANGELOG](https://github.com/mcass19/ex_ratatui/blob/main/CHANGELOG.md) for details.
+
 ```elixir
 %WidgetList{
   items: [
@@ -352,22 +354,30 @@ A vertical list of heterogeneous widgets with optional selection and scrolling. 
 
 ### SlashCommands
 
-A command palette with fuzzy search that renders a scrollable list of `SlashCommands.Command` structs filtered by the current input.
+`SlashCommands` is a utility module (not a widget struct) that helps you build a command palette on top of `Popup` + `List`. Use `parse/1` to detect a `/prefix`, `match_commands/2` to filter your commands, and `render_autocomplete/2` to build the popup widgets you append to your render list.
 
 ```elixir
 alias ExRatatui.Widgets.SlashCommands
 alias ExRatatui.Widgets.SlashCommands.Command
 
-%SlashCommands{
-  commands: [
-    %Command{name: "help", description: "Show help"},
-    %Command{name: "quit", description: "Exit the app"}
-  ],
-  input: "he",
-  selected: 0,
-  block: %Block{title: "Commands", borders: [:all]}
-}
+commands = [
+  %Command{name: "help", description: "Show help"},
+  %Command{name: "quit", description: "Exit the app"}
+]
+
+# In your render/2:
+case SlashCommands.parse(input_text) do
+  {:command, prefix} ->
+    matched = SlashCommands.match_commands(commands, prefix)
+    popup_widgets = SlashCommands.render_autocomplete(matched, area: area, selected: 0)
+    base_widgets ++ popup_widgets
+
+  :no_command ->
+    base_widgets
+end
 ```
+
+See [`examples/chat_interface.exs`](https://github.com/mcass19/ex_ratatui/blob/main/examples/chat_interface.exs) for a full integration.
 
 ## Examples
 
