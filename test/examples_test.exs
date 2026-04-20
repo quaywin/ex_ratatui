@@ -135,5 +135,110 @@ defmodule ExRatatui.ExamplesTest do
 
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 2_000
     end
+
+    # system_monitor reads from /proc, /sys, :os.cmd("df"), :inet.getifaddrs.
+    # All readers fall back to safe defaults (nil / %{total: 0, used: 0} / [])
+    # when the source is missing, so the test doesn't need to mock the host —
+    # it just has to tolerate both "real Linux box" and "CI sandbox" outcomes.
+    test "system_monitor starts, renders, and stops on quit event" do
+      compile_example_modules("system_monitor.exs")
+
+      {:ok, pid} = SystemMonitor.start_link(name: nil, test_mode: {80, 24})
+      ref = Process.monitor(pid)
+
+      snapshot = ExRatatui.Runtime.snapshot(pid)
+      assert snapshot.mode == :callbacks
+      assert snapshot.render_count >= 1
+
+      # Refresh key path: collect_stats runs again, render_count bumps.
+      refresh = %ExRatatui.Event.Key{code: "r", modifiers: [], kind: "press"}
+      :ok = ExRatatui.Runtime.inject_event(pid, refresh)
+
+      # Give the server a moment to process the event and re-render.
+      _ = :sys.get_state(pid)
+      bumped = ExRatatui.Runtime.snapshot(pid)
+      assert bumped.render_count > snapshot.render_count
+
+      quit = %ExRatatui.Event.Key{code: "q", modifiers: [], kind: "press"}
+      :ok = ExRatatui.Runtime.inject_event(pid, quit)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 2_000
+    end
+  end
+
+  # chat_interface uses the raw `ExRatatui.run/1 + poll_event` loop — no
+  # `use ExRatatui.App`, so there's no Server to start_link and no
+  # `test_mode` seam. Instead we compile the module, then exercise the
+  # two public pieces the example depends on against a test terminal:
+  # the `SlashCommands.parse`/`match_commands` pipeline and the widget
+  # stack (Textarea + Markdown + WidgetList) it composes per frame.
+  describe "raw-run example smoke tests" do
+    alias ExRatatui.Layout.Rect
+    alias ExRatatui.Native
+    alias ExRatatui.Widgets.SlashCommands
+    alias ExRatatui.Widgets.SlashCommands.Command
+    alias ExRatatui.Widgets.{Block, Markdown, Paragraph, Textarea, WidgetList}
+
+    test "chat_interface compiles and its widget stack draws to a test terminal" do
+      compile_example_modules("chat_interface.exs")
+
+      # The compiled module must expose `run/0`, the raw entry point.
+      assert function_exported?(ChatApp, :run, 0)
+
+      # --- slash-command pipeline the example relies on ----------------
+      commands = [
+        %Command{name: "help", description: "Show available commands"},
+        %Command{name: "quit", description: "Exit the chat", aliases: ["exit", "q"]}
+      ]
+
+      assert {:command, "he"} = SlashCommands.parse("/he")
+      assert :no_command = SlashCommands.parse("hello")
+
+      matched = SlashCommands.match_commands(commands, "he")
+      assert [%Command{name: "help"} | _] = matched
+
+      # --- draw the example's frame shape to a test terminal -----------
+      terminal = ExRatatui.init_test_terminal(80, 24)
+      on_exit(fn -> Native.restore_terminal(terminal) end)
+
+      textarea_state = ExRatatui.textarea_new()
+
+      header = %Paragraph{text: "AI Chat Interface"}
+
+      items = [
+        {%Paragraph{text: " You "}, 1},
+        {%Markdown{content: "hello **world**"}, 1},
+        {%Paragraph{text: ""}, 1},
+        {%Paragraph{text: " AI "}, 1},
+        {%Markdown{content: "# reply\n\n- item"}, 3}
+      ]
+
+      message_list = %WidgetList{
+        items: items,
+        scroll_offset: 0,
+        block: %Block{title: "Chat", borders: [:all]}
+      }
+
+      textarea = %Textarea{
+        state: textarea_state,
+        placeholder: "Type a message...",
+        block: %Block{title: "Message", borders: [:all]}
+      }
+
+      widgets = [
+        {header, %Rect{x: 0, y: 0, width: 80, height: 1}},
+        {message_list, %Rect{x: 0, y: 1, width: 80, height: 18}},
+        {textarea, %Rect{x: 0, y: 19, width: 80, height: 5}}
+      ]
+
+      assert :ok = ExRatatui.draw(terminal, widgets)
+
+      content = ExRatatui.get_buffer_content(terminal)
+      assert content =~ "AI Chat Interface"
+      assert content =~ "Chat"
+      assert content =~ "Message"
+      assert content =~ "hello"
+      assert content =~ "reply"
+    end
   end
 end
