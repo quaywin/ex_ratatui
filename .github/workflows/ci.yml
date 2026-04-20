@@ -84,3 +84,79 @@ jobs:
 
       - run: mix test
         if: ${{ ! matrix.lint }}
+
+  distributed:
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    env:
+      EX_RATATUI_BUILD: "true"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            _build
+            deps
+          key: ${{ runner.os }}-distributed-1.19-28.2-${{ hashFiles('mix.lock') }}
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/ex_ratatui/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('native/ex_ratatui/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.2"
+          elixir-version: "1.19"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: mix deps.get --check-locked
+
+      - run: mix compile --warnings-as-errors
+
+      - run: elixir --sname test -S mix test --only distributed
+
+  slow:
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    env:
+      EX_RATATUI_BUILD: "true"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            _build
+            deps
+          key: ${{ runner.os }}-slow-1.19-28.2-${{ hashFiles('mix.lock') }}
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/ex_ratatui/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('native/ex_ratatui/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.2"
+          elixir-version: "1.19"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: mix deps.get --check-locked
+
+      - run: mix compile --warnings-as-errors
+
+      - run: mix test --only slow
