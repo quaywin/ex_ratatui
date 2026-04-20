@@ -7,10 +7,13 @@ defmodule ExRatatui.Distributed.IntegrationTest do
   alias ExRatatui.Distributed.Listener
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Text.{Line, Span}
-  alias ExRatatui.Widgets.Paragraph
+  alias ExRatatui.Widgets.{Bar, BarChart, BarGroup, Canvas, Chart, Paragraph}
+  alias ExRatatui.Widgets.Canvas.Map, as: CanvasMap
+  alias ExRatatui.Widgets.Chart.{Axis, Dataset}
 
   @peer_app ExRatatui.Test.PeerApp
   @peer_rich_app ExRatatui.Test.PeerRichApp
+  @peer_widgets_app ExRatatui.Test.PeerWidgetsApp
 
   # Excluded by default via test_helper.exs.
   # Run with: elixir --sname test -S mix test --only distributed
@@ -143,6 +146,56 @@ defmodule ExRatatui.Distributed.IntegrationTest do
                     ]
                   }
                 }, %Rect{width: 80, height: 24}}
+             ] = widgets
+
+      GenServer.stop(server_pid)
+      :rpc.call(peer_node, Supervisor, :stop, [listener])
+    end
+
+    test "chart, grouped bars, and canvas map widgets survive the node boundary", %{
+      peer_node: peer_node
+    } do
+      {:ok, listener} =
+        start_peer_listener(peer_node, @peer_widgets_app, app_opts: [test_pid: self()])
+
+      {:ok, server_pid} =
+        :rpc.call(peer_node, Listener, :start_session, [self(), 80, 24, listener])
+
+      assert_receive {:mounted, ^server_pid, _opts}, 2000
+
+      assert_receive {:ex_ratatui_draw, widgets}, 2000
+
+      assert [
+               {%Chart{
+                  datasets: [
+                    %Dataset{
+                      name: "series",
+                      data: [{+0.0, 1.0}, {1.0, 2.0}, {2.0, 1.5}],
+                      marker: :braille,
+                      graph_type: :line
+                    }
+                  ],
+                  x_axis: %Axis{bounds: {+0.0, 2.0}, labels: ["0", "2"]},
+                  y_axis: %Axis{bounds: {+0.0, 3.0}, labels: ["0", "3"]}
+                }, %Rect{}},
+               {%BarChart{
+                  groups: [
+                    %BarGroup{
+                      label: "Q1",
+                      bars: [
+                        %Bar{label: "Elixir", value: 80},
+                        %Bar{label: "Rust", value: 95}
+                      ]
+                    }
+                  ],
+                  group_gap: 2
+                }, %Rect{}},
+               {%Canvas{
+                  x_bounds: {-180.0, 180.0},
+                  y_bounds: {-90.0, 90.0},
+                  marker: :braille,
+                  shapes: [%CanvasMap{resolution: :low, color: :green}]
+                }, %Rect{}}
              ] = widgets
 
       GenServer.stop(server_pid)
