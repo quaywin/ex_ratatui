@@ -1,6 +1,19 @@
 defmodule ExRatatui.ExamplesTest do
   use ExUnit.Case, async: true
 
+  # These modules are compiled at runtime via `compile_example_modules/1`
+  # from examples/*.exs, so the compiler can't see them statically.
+  @compile {:no_warn_undefined,
+            [
+              ChatApp,
+              CounterApp,
+              CustomWidgetsExample,
+              ReducerCounterApp,
+              RichTextShowcase,
+              SystemMonitor,
+              WidgetShowcase
+            ]}
+
   @examples_dir Path.expand("../examples", __DIR__)
 
   for path <- Path.wildcard(Path.expand("../examples/*.exs", __DIR__)) do
