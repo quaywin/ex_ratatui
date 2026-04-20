@@ -51,7 +51,10 @@ defmodule ExRatatui do
   ## Testing
 
   Use `init_test_terminal/2` and `get_buffer_content/1` for headless
-  rendering verification in CI — no TTY required.
+  rendering verification in CI — no TTY required. See the
+  [Testing](guides/testing.md) guide for widget-level and app-level
+  patterns, and [Debugging](guides/debugging.md) for `Runtime.snapshot/1`
+  and tracing.
   """
 
   require Logger

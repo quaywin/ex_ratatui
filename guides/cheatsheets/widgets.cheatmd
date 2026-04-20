@@ -1,51 +1,93 @@
 # Widgets Cheatsheet
 
-## Rich Text
+Quick lookup for every built-in widget and helper. One example per struct, key fields inline. For concepts see [Building UIs](../building_uis.md); for full option shapes, the module docs.
 
-`Paragraph.text`, `List.items`, `Table.rows`/`header`, `Tabs.titles`, and `Block.title` accept a `String.t()`, `%Span{}`, `%Line{}`, or `[%Span{}]` — see the [Rich Text section](../building_uis.md#rich-text) in Building UIs.
+## Styles & rich text
+{: .col-2}
+
+### Style
+
+```elixir
+%Style{
+  fg: :green,                         # or {r,g,b}, or 0..255 index
+  bg: :reset,
+  modifiers: [:bold, :italic, :underlined, :reversed, :dim]
+}
+```
+
+Colors accept `:reset`, named atoms, `{r, g, b}`, or 0–255. Modifiers are additive.
+
+### Rich text spans/lines
 
 ```elixir
 alias ExRatatui.Text.{Line, Span}
 
 Line.new([
-  Span.new(" ok ", style: %Style{fg: :green}),
-  Span.new("Build", style: %Style{fg: :yellow, modifiers: [:bold]})
+  Span.new(" ok ", style: %Style{fg: :green, modifiers: [:bold]}),
+  Span.new(" build passed", style: %Style{fg: :gray})
 ])
 ```
 
-## Paragraph
+Accepted by `Paragraph.text`, `List.items`, `Table.rows`/`header`, `Tabs.titles`, `Block.title`.
 
-Text display with optional wrapping, alignment, and scrolling.
+## Layout
+{: .col-2}
+
+### `Layout.split/3`
+
+```elixir
+alias ExRatatui.Layout
+
+[left, right] =
+  Layout.split(frame_rect, :horizontal, [
+    {:percentage, 30},
+    {:percentage, 70}
+  ])
+```
+
+Direction: `:horizontal` or `:vertical`. Constraints: `:length`, `:percentage`, `:min`, `:max`, `:ratio`.
+
+### `%Rect{}`
+
+```elixir
+%ExRatatui.Layout.Rect{x: 0, y: 0, width: 80, height: 24}
+```
+
+All widgets render into a `Rect`. Returned from `Layout.split/3`, derived from `%Frame{}`, or built manually for absolute placement.
+
+## Text & content
+{: .col-2}
+
+### Paragraph
 
 ```elixir
 %Paragraph{
-  text: "Hello, world!",
+  text: "Hello!",                      # String | Span | Line | [Span]
   style: %Style{fg: :green},
-  alignment: :center,         # :left | :center | :right
-  wrap: true,                 # enable word wrapping
-  scroll: {0, 0},             # {vertical, horizontal} offset
+  alignment: :center,                  # :left | :center | :right
+  wrap: true,
+  scroll: {0, 0},                      # {vertical, horizontal}
   block: %Block{title: " Info ", borders: [:all]}
 }
 ```
 
-## Block
-
-Container with borders, title, and padding. Wraps other widgets via their `:block` field.
+### Markdown
 
 ```elixir
-%Block{
-  title: " My Panel ",
-  borders: [:all],            # [:all] | [:top, :bottom, :left, :right]
-  border_type: :rounded,      # :plain | :rounded | :double | :thick
-  border_style: %Style{fg: :cyan},
-  style: %Style{},
-  padding: {0, 0, 0, 0}      # {left, right, top, bottom}
+%Markdown{
+  content: "# Title\n\n**bold** *italic* `code`\n\n- a\n- b",
+  wrap: true,
+  scroll: {0, 0},
+  block: %Block{borders: [:all]}
 }
 ```
 
-## List
+Supports headings, bold/italic, inline code, lists.
 
-Selectable list of text items with highlight support.
+## Lists, tables & scrolling
+{: .col-2}
+
+### List
 
 ```elixir
 %List{
@@ -53,62 +95,105 @@ Selectable list of text items with highlight support.
   selected: 0,
   highlight_style: %Style{fg: :yellow, modifiers: [:bold]},
   highlight_symbol: ">> ",
-  style: %Style{},
   block: %Block{title: " Menu ", borders: [:all]}
 }
 ```
 
-## Table
-
-Multi-column data grid with configurable column widths.
+### Table
 
 ```elixir
 %Table{
-  header: ["Name", "Status", "Score"],
-  rows: [
-    ["Alice", "Active", "95"],
-    ["Bob", "Idle", "87"]
-  ],
-  widths: [{:percentage, 40}, {:percentage, 30}, {:percentage, 30}],
+  header: ["Name", "Score"],
+  rows: [["Alice", "95"], ["Bob", "87"]],
+  widths: [{:percentage, 70}, {:percentage, 30}],
   selected: 0,
   highlight_style: %Style{fg: :yellow},
   column_spacing: 1,
-  block: %Block{title: " Scores ", borders: [:all]}
+  block: %Block{borders: [:all]}
 }
 ```
 
-Widths accept `{:length, n}`, `{:percentage, n}`, `{:min, n}`, `{:max, n}`, `{:ratio, n, d}`.
+### WidgetList
 
-## Gauge
+```elixir
+%WidgetList{
+  items: [
+    {%Paragraph{text: "Row 1"}, 3},    # {widget, height}
+    {%Paragraph{text: "Row 2"}, 5}
+  ],
+  selected: 0,
+  scroll_offset: 0,
+  highlight_style: %Style{bg: {50, 50, 50}}
+}
+```
 
-Filled progress bar with optional label.
+Row-clipped scroll. Good for 1k+ items; only visible rows cross the NIF boundary.
+
+### Scrollbar
+
+```elixir
+%Scrollbar{
+  orientation: :vertical_right,        # or :vertical_left, :horizontal_bottom, :horizontal_top
+  content_length: 100,
+  position: 25,
+  viewport_content_length: 20,
+  thumb_style: %Style{fg: :yellow}
+}
+```
+
+## Progress & activity
+{: .col-2}
+
+### Gauge
 
 ```elixir
 %Gauge{
-  ratio: 0.65,                # 0.0 to 1.0
+  ratio: 0.65,                         # 0.0..1.0
   label: "65%",
   gauge_style: %Style{fg: :green},
-  block: %Block{title: " Progress ", borders: [:all]}
+  block: %Block{borders: [:all]}
 }
 ```
 
-## LineGauge
-
-Horizontal progress bar with filled/unfilled styling.
+### LineGauge
 
 ```elixir
 %LineGauge{
   ratio: 0.4,
   label: "Loading...",
   filled_style: %Style{fg: :blue},
-  unfilled_style: %Style{fg: :dark_gray},
-  block: %Block{borders: [:all]}
+  unfilled_style: %Style{fg: :dark_gray}
 }
 ```
 
-## BarChart
+Single-cell-tall bar — great for compact status rows.
 
-Vertical or horizontal bar chart with optional per-bar styling and text values.
+### Sparkline
+
+```elixir
+%Sparkline{
+  data: [0, 1, 3, 5, 8, nil, 2, 4],    # nil = absent
+  max: 8,                              # nil auto-scales
+  direction: :left_to_right,
+  bar_set: :nine_levels,
+  style: %Style{fg: :cyan}
+}
+```
+
+### Throbber
+
+```elixir
+%Throbber{
+  label: "Loading",
+  throbber_set: :braille,              # :braille | :dots | :line | :ascii
+  step: state.tick,                    # caller increments
+  throbber_style: %Style{fg: :cyan}
+}
+```
+
+Drive with `Subscription.interval/3` (reducer) or `Process.send_after/3` (callback).
+
+### BarChart
 
 ```elixir
 alias ExRatatui.Widgets.Bar
@@ -116,97 +201,120 @@ alias ExRatatui.Widgets.Bar
 %BarChart{
   data: [
     %Bar{label: "Mon", value: 42},
-    %Bar{label: "Tue", value: 67, style: %Style{fg: :yellow}},
-    %Bar{label: "Wed", value: 30, text_value: "30%"}
+    %Bar{label: "Tue", value: 67, style: %Style{fg: :yellow}}
   ],
   bar_width: 5,
   bar_gap: 1,
-  bar_style: %Style{fg: :green},
-  value_style: %Style{fg: :white, modifiers: [:bold]},
-  label_style: %Style{fg: :cyan},
-  max: 100,                      # nil auto-scales to the largest value
-  direction: :vertical,          # :vertical | :horizontal
-  block: %Block{title: " Traffic ", borders: [:all]}
+  direction: :vertical,                # or :horizontal
+  max: 100                             # nil auto-scales
 }
 ```
 
-`Bar.value` must be a non-negative integer. Floats and negative numbers raise `ArgumentError`.
+Use `:groups` with `%BarGroup{}` for side-by-side clusters (mutually exclusive with `:data`).
 
-### Grouped bars
+## Input
+{: .col-2}
 
-Pass `%BarGroup{}` entries via `:groups` to render side-by-side clusters with a shared caption — useful for comparing the same metric across categories. Use `:group_gap` to space the clusters apart.
+### TextInput
 
 ```elixir
-alias ExRatatui.Widgets.{Bar, BarChart, BarGroup}
+state = ExRatatui.text_input_new()     # mount once, keep in app state
 
-%BarChart{
-  groups: [
-    %BarGroup{label: "Q1", bars: [%Bar{label: "A", value: 10}, %Bar{label: "B", value: 20}]},
-    %BarGroup{label: "Q2", bars: [%Bar{label: "A", value: 15}, %Bar{label: "B", value: 25}]}
+%TextInput{
+  state: state,
+  placeholder: "Type here...",
+  style: %Style{fg: :white},
+  cursor_style: %Style{bg: :white, fg: :black},
+  block: %Block{borders: [:all]}
+}
+
+ExRatatui.text_input_handle_key(state, key_event)
+value = ExRatatui.text_input_get_value(state)
+```
+
+### Textarea
+
+```elixir
+state = ExRatatui.textarea_new()
+
+%Textarea{
+  state: state,
+  placeholder: "Enter message...",
+  cursor_line_style: %Style{bg: {40, 40, 40}},
+  line_number_style: %Style{fg: :dark_gray},  # nil hides line numbers
+  block: %Block{borders: [:all]}
+}
+
+ExRatatui.textarea_handle_key(state, key_event)
+value = ExRatatui.textarea_get_value(state)
+```
+
+Enter = newline, Ctrl+Enter = submit.
+
+### Checkbox
+
+```elixir
+%Checkbox{
+  label: "Enable notifications",
+  checked: true,
+  checked_style: %Style{fg: :green},
+  checked_symbol: "[x]",
+  unchecked_symbol: "[ ]"
+}
+```
+
+### SlashCommands
+
+```elixir
+alias ExRatatui.Widgets.SlashCommands
+alias ExRatatui.Widgets.SlashCommands.Command
+
+commands = [
+  %Command{name: "help", description: "Show help", aliases: ["h", "?"]},
+  %Command{name: "quit", description: "Exit", aliases: ["q"]}
+]
+
+case SlashCommands.parse(input_text) do
+  {:slash, query} -> SlashCommands.match_commands(commands, query)
+  :no_slash -> []
+end
+```
+
+Pair the matches with a `%Popup{}` in `render/2` to show autocomplete.
+
+## Charts & canvas
+{: .col-2}
+
+### Chart
+
+```elixir
+alias ExRatatui.Widgets.Chart.{Axis, Dataset}
+
+%Chart{
+  datasets: [
+    %Dataset{
+      name: "CPU",
+      data: [{0.0, 12.0}, {1.0, 25.0}, {2.0, 48.0}],
+      marker: :braille,
+      graph_type: :line,                # :line | :scatter | :bar
+      style: %Style{fg: :cyan}
+    }
   ],
-  bar_width: 3,
-  bar_gap: 1,
-  group_gap: 3,
-  max: 30
+  x_axis: %Axis{title: "Time", bounds: {0.0, 3.0}, labels: ["0", "1", "2", "3"]},
+  y_axis: %Axis{title: "Usage %", bounds: {0.0, 100.0}, labels: ["0", "50", "100"]},
+  legend_position: :top_right            # nil hides
 }
 ```
 
-Set either `:data` or `:groups`, not both. When `:data` is used, the chart renders as a single anonymous group.
-
-## Sparkline
-
-Compact single-line bar chart for streams or time-series. `nil` entries render as absent-value symbols.
-
-```elixir
-%Sparkline{
-  data: [0, 1, 3, 5, 8, 3, 1, nil, 2, 4],
-  max: 8,                               # nil auto-scales to the largest value
-  direction: :left_to_right,            # :left_to_right | :right_to_left
-  bar_set: :nine_levels,                # :nine_levels | :three_levels | [String.t(), ...]
-  style: %Style{fg: :cyan},
-  absent_value_symbol: "·",
-  absent_value_style: %Style{fg: :dark_gray},
-  block: %Block{title: " CPU ", borders: [:all]}
-}
-```
-
-Entries must be non-negative integers or `nil`. Custom `:bar_set` lists must be non-empty strings — the symbols are proportionally mapped across the nine density levels.
-
-## Calendar
-
-Monthly calendar grid with per-day event highlighting. Events accept a list of `{Date, Style}` tuples or a `%{Date => Style}` map (nil map values are skipped).
-
-```elixir
-%Calendar{
-  display_date: ~D[2026-03-15],
-  events: [
-    {~D[2026-03-10], %Style{fg: :red, modifiers: [:bold]}},
-    {~D[2026-03-20], %Style{fg: :green}}
-  ],
-  default_style: %Style{fg: :white},
-  show_month_header: true,             # default true
-  header_style: %Style{fg: :yellow, modifiers: [:bold]},
-  show_weekdays_header: true,          # default true
-  weekday_style: %Style{fg: :cyan},
-  show_surrounding: %Style{fg: :dark_gray},  # nil hides surrounding days
-  block: %Block{title: " March ", borders: [:all]}
-}
-```
-
-`:display_date` must be a `%Date{}`, booleans must be actual booleans, and event entries must be `{%Date{}, %Style{}}` tuples — anything else raises `ArgumentError`. Needs roughly 22×8 cells (24×10 with a block).
-
-## Canvas
-
-2D drawing surface. Shapes are plotted in the virtual coordinate space defined by `:x_bounds` / `:y_bounds`, then sampled onto cells using the chosen `:marker`. Colors are plain `Color.t()` values — text modifiers do not apply to canvas pixels.
+### Canvas
 
 ```elixir
 alias ExRatatui.Widgets.Canvas.{Circle, Label, Line, Points, Rectangle}
-alias ExRatatui.Widgets.Canvas.Map, as: CanvasMap
 
 %Canvas{
   x_bounds: {0.0, 100.0},
   y_bounds: {0.0, 50.0},
-  marker: :braille,              # or :dot, :block, :bar, :half_block
+  marker: :braille,                     # :braille | :dot | :block | :bar | :half_block
   background_color: :black,
   shapes: [
     %Line{x1: 0.0, y1: 0.0, x2: 100.0, y2: 50.0, color: :cyan},
@@ -214,72 +322,57 @@ alias ExRatatui.Widgets.Canvas.Map, as: CanvasMap
     %Circle{x: 70.0, y: 25.0, radius: 10.0, color: :magenta},
     %Points{coords: [{20.0, 40.0}, {50.0, 30.0}], color: :green},
     %Label{x: 70.0, y: 25.0, text: "★", color: :white}
-  ],
-  block: %Block{title: " Plot ", borders: [:all]}
+  ]
 }
 ```
 
-`Rectangle` is an outline anchored at its bottom-left corner; `Circle` is an outline centered on `{x, y}`. Bounds must be `{min, max}` with `min <= max`; `width`, `height`, and `radius` must be non-negative. `:braille` gives the finest resolution; pick `:dot` or `:block` for terminals without Braille fonts.
-
-### World map and labels
-
-`%CanvasMap{}` paints the world's coastlines (pair with bounds `{-180, 180}` × `{-90, 90}`); `%Label{}` writes annotation text on top of the canvas at canvas-space coordinates.
+### World map
 
 ```elixir
+alias ExRatatui.Widgets.Canvas.Map, as: CanvasMap
+
 %Canvas{
   x_bounds: {-180.0, 180.0},
   y_bounds: {-90.0, 90.0},
   marker: :dot,
   shapes: [
-    %CanvasMap{resolution: :high, color: :green},  # :low | :high
-    %Label{x: -74.0, y: 40.7, text: "NYC", color: :yellow},
-    %Label{x: 139.7, y: 35.7, text: "Tokyo", color: :yellow}
+    %CanvasMap{resolution: :high, color: :green},
+    %Label{x: -74.0, y: 40.7, text: "NYC", color: :yellow}
   ]
 }
 ```
 
-`Map.resolution` accepts `:low` (cheap) or `:high` (richer coastlines). `Label.text` must be a binary; the color applies as the text foreground.
+## Containers & overlays
+{: .col-2}
 
-## Chart
-
-X/Y line, scatter, or bar chart with axes, labels, and legend. Each `%Dataset{}` carries `{x, y}` numeric tuples plus its own marker, graph type, and style. Pass `nil` as `:legend_position` to hide the legend.
+### Block
 
 ```elixir
-alias ExRatatui.Widgets.Chart
-alias ExRatatui.Widgets.Chart.{Axis, Dataset}
-
-%Chart{
-  datasets: [
-    %Dataset{
-      name: "CPU",
-      data: [{0.0, 12.0}, {1.0, 25.0}, {2.0, 48.0}, {3.0, 31.0}],
-      marker: :braille,            # or :dot, :block, :bar, :half_block
-      graph_type: :line,           # or :scatter, :bar
-      style: %Style{fg: :cyan}
-    }
-  ],
-  x_axis: %Axis{
-    title: "Time",
-    bounds: {0.0, 3.0},
-    labels: ["0", "1", "2", "3"]
-  },
-  y_axis: %Axis{
-    title: "Usage %",
-    bounds: {0.0, 100.0},
-    labels: ["0", "50", "100"]
-  },
-  legend_position: :top_right,     # or :top, :top_left, :bottom, :bottom_left,
-                                   # :bottom_right, :left, :right, or nil to hide
-  hidden_legend_constraints: {{:ratio, 1, 4}, {:ratio, 1, 4}},
-  block: %Block{title: " Metrics ", borders: [:all]}
+%Block{
+  title: " Panel ",                     # String | Span | Line | [Span]
+  borders: [:all],                      # or [:top, :left, ...]
+  border_type: :rounded,                # :plain | :rounded | :double | :thick
+  border_style: %Style{fg: :cyan},
+  padding: {0, 0, 0, 0}                 # {left, right, top, bottom}
 }
 ```
 
-`:hidden_legend_constraints` accepts a `{width, height}` pair of layout constraints; the legend is hidden when its size exceeds them against the chart area. Mixing `:graph_type` per dataset (`:line` + `:scatter` overlay) is supported.
+Wraps another widget via that widget's `:block` field.
 
-## Tabs
+### Popup
 
-Tab navigation bar with selected highlight.
+```elixir
+%Popup{
+  content: %Paragraph{text: "Are you sure?"},
+  percent_width: 50,                    # or fixed_width: 40
+  percent_height: 30,                   # or fixed_height: 10
+  block: %Block{title: " Confirm ", borders: [:all], border_type: :double}
+}
+```
+
+Renders centered on top of whatever's already drawn.
+
+### Tabs
 
 ```elixir
 %Tabs{
@@ -292,183 +385,32 @@ Tab navigation bar with selected highlight.
 }
 ```
 
-## Scrollbar
-
-Decorative scrollbar indicator for scrollable content.
-
-```elixir
-%Scrollbar{
-  orientation: :vertical_right,   # :vertical_right | :vertical_left | :horizontal_bottom | :horizontal_top
-  content_length: 100,
-  position: 25,
-  viewport_content_length: 20,    # optional, improves thumb sizing
-  thumb_style: %Style{fg: :yellow},
-  track_style: %Style{fg: :dark_gray},
-  thumb_symbol: "█",              # optional, defaults to ratatui's built-in
-  track_symbol: "│",              # optional
-  begin_symbol: "▲",              # optional start-arrow glyph
-  end_symbol: "▼"                 # optional end-arrow glyph
-}
-```
-
-## Checkbox
-
-Boolean toggle with customizable symbols.
-
-```elixir
-%Checkbox{
-  label: "Enable notifications",
-  checked: true,
-  style: %Style{},
-  checked_style: %Style{fg: :green},
-  checked_symbol: "[x]",
-  unchecked_symbol: "[ ]",
-  block: nil
-}
-```
-
-## TextInput
-
-Single-line text editor. Requires a NIF-managed state reference.
-
-```elixir
-# Create state once, then reuse across renders
-state = ExRatatui.text_input_new()
-
-%TextInput{
-  state: state,
-  placeholder: "Type here...",
-  style: %Style{fg: :white},
-  cursor_style: %Style{bg: :white, fg: :black},
-  placeholder_style: %Style{fg: :dark_gray},
-  block: %Block{title: " Input ", borders: [:all]}
-}
-
-# Handle key events
-ExRatatui.text_input_handle_key(state, key_event)
-
-# Read current value
-value = ExRatatui.text_input_get_value(state)
-```
-
-## Textarea
-
-Multi-line text editor with cursor line highlighting.
-
-```elixir
-state = ExRatatui.textarea_new()
-
-%Textarea{
-  state: state,
-  placeholder: "Enter message...",
-  style: %Style{fg: :white},
-  cursor_style: %Style{bg: :white, fg: :black},
-  cursor_line_style: %Style{bg: {40, 40, 40}},
-  line_number_style: %Style{fg: :dark_gray},   # nil to hide line numbers
-  placeholder_style: %Style{fg: :dark_gray},
-  block: %Block{title: " Editor ", borders: [:all]}
-}
-
-# Handle key events (Enter inserts newline, Ctrl+Enter submits)
-ExRatatui.textarea_handle_key(state, key_event)
-
-# Read current value
-value = ExRatatui.textarea_get_value(state)
-```
-
-## Clear
-
-Fills the area with blank cells. Useful for clearing regions before redrawing.
+### Clear
 
 ```elixir
 %Clear{}
 ```
 
-## Markdown
+Fills the rect with blank cells. Use before a popup to dim underlying content.
 
-Renders markdown text with syntax highlighting for headings, bold, italic, code, and lists.
-
-```elixir
-%Markdown{
-  content: "# Title\n\nSome **bold** and *italic* text.\n\n- Item 1\n- Item 2",
-  style: %Style{},
-  wrap: true,
-  scroll: {0, 0},
-  block: %Block{borders: [:all]}
-}
-```
-
-## Throbber
-
-Animated loading spinner. Caller must increment `:step` to animate.
+## Calendar
+{: .width-50}
 
 ```elixir
-%Throbber{
-  label: "Loading",
-  throbber_set: :braille,     # :braille | :dots | :line | :ascii
-  step: state.tick,           # increment this to animate
-  style: %Style{},
-  throbber_style: %Style{fg: :cyan},
-  block: nil
-}
-```
-
-Use `Subscription.interval/3` (reducer) or `Process.send_after/3` (callback) to increment the step.
-
-## Popup
-
-Centered overlay. Wraps a content widget and renders it on top of existing content.
-
-```elixir
-%Popup{
-  content: %Paragraph{text: "Are you sure?"},
-  percent_width: 50,          # percentage of terminal width
-  percent_height: 30,
-  # OR use fixed dimensions:
-  # fixed_width: 40,
-  # fixed_height: 10,
-  block: %Block{title: " Confirm ", borders: [:all], border_type: :double}
-}
-```
-
-## WidgetList
-
-Scrollable container for heterogeneous widgets with row-based scrolling and partial clipping.
-
-```elixir
-%WidgetList{
-  items: [
-    {%Paragraph{text: "Row 1"}, 3},    # {widget, height}
-    {%Paragraph{text: "Row 2"}, 3},
-    {%Paragraph{text: "Row 3"}, 5}
+%Calendar{
+  display_date: ~D[2026-03-15],
+  events: [
+    {~D[2026-03-10], %Style{fg: :red, modifiers: [:bold]}},
+    {~D[2026-03-20], %Style{fg: :green}}
   ],
-  selected: 0,
-  scroll_offset: 0,           # row index of first visible item
-  highlight_style: %Style{bg: {50, 50, 50}},
-  block: %Block{title: " Items ", borders: [:all]}
+  default_style: %Style{fg: :white},
+  show_month_header: true,
+  header_style: %Style{fg: :yellow, modifiers: [:bold]},
+  show_weekdays_header: true,
+  weekday_style: %Style{fg: :cyan},
+  show_surrounding: %Style{fg: :dark_gray},   # nil hides surrounding days
+  block: %Block{title: " March ", borders: [:all]}
 }
 ```
 
-## SlashCommands
-
-Autocomplete overlay for slash commands. Combines `SlashCommands` functions with a `Popup`.
-
-```elixir
-alias ExRatatui.Widgets.SlashCommands
-alias ExRatatui.Widgets.SlashCommands.Command
-
-commands = [
-  %Command{name: "help", description: "Show help", aliases: ["h", "?"]},
-  %Command{name: "quit", description: "Exit the app", aliases: ["q"]}
-]
-
-# Parse user input for a slash prefix
-case SlashCommands.parse(input_text) do
-  {:slash, query} ->
-    matches = SlashCommands.match_commands(commands, query)
-    # Render matches in a Popup via your render/2 callback
-
-  :no_slash ->
-    # Normal input, no autocomplete needed
-end
-```
+Needs ~22×8 cells (24×10 with a block). `events` accepts a keyword-like list of `{%Date{}, %Style{}}` tuples or a `%{Date => Style}` map.

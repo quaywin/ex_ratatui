@@ -34,34 +34,9 @@ Build rich terminal UIs in Elixir with ratatui's layout engine, widget library, 
 | Example | Run | Description |
 |---------|-----|-------------|
 | `hello_world.exs` | `mix run examples/hello_world.exs` | Minimal paragraph display |
-| `counter.exs` | `mix run examples/counter.exs` | Interactive counter with key events |
 | `counter_app.exs` | `mix run examples/counter_app.exs` | Counter using `ExRatatui.App` behaviour |
-| `reducer_counter_app.exs` | `mix run examples/reducer_counter_app.exs` | Counter using the reducer runtime with subscriptions |
-| `system_monitor.exs` | `mix run examples/system_monitor.exs` | Linux system dashboard: CPU, memory, disk, network, BEAM stats (Linux/Nerves only). **Also runs over SSH and Erlang distribution** (see below). |
-| `widget_showcase.exs` | `mix run examples/widget_showcase.exs` | Interactive showcase: tabs, progress bars, checkboxes, text input, scrollable logs |
-| `task_manager.exs` | `mix run examples/task_manager.exs` | Full task manager with tabs, table, scrollbar, line gauge, and more |
-| `chat_interface.exs` | `mix run examples/chat_interface.exs` | AI chat interface: markdown, textarea, throbber, popup, slash commands |
-| `focus_multi_panel.exs` | `mix run examples/focus_multi_panel.exs` | Three-panel layout with Tab-cycled focus using `ExRatatui.Focus` |
-| `task_manager/` | See [README](https://github.com/mcass19/ex_ratatui/tree/main/examples/task_manager) | Supervised Ecto + SQLite CRUD app. **Also runs over SSH**, multiple clients share one DB |
 
-### Try an example over SSH
-
-```sh
-mix run --no-halt examples/system_monitor.exs --ssh
-# in another terminal:
-ssh demo@localhost -p 2222      # password: demo
-```
-
-### Try an example over Erlang Distribution
-
-```sh
-# Terminal 1 — start the app node
-elixir --sname app --cookie demo -S mix run --no-halt examples/system_monitor.exs --distributed
-
-# Terminal 2 — attach from another node
-iex --sname local --cookie demo -S mix
-iex> ExRatatui.Distributed.attach(:"app@hostname", SystemMonitor)
-```
+The full catalog (system monitor, chat interface, task manager, Ecto-backed CRUD, and more — plus SSH and Erlang-distribution one-liners) lives in [`examples/README.md`](examples/README.md).
 
 ## Built with ExRatatui
 
@@ -134,18 +109,9 @@ ExRatatui.run(fn terminal ->
 end)
 ```
 
-Try the [examples](https://github.com/mcass19/ex_ratatui/tree/main/examples) for more, e.g. `mix run examples/hello_world.exs`.
+Try the [examples](examples/README.md) for more, e.g. `mix run examples/hello_world.exs`.
 
-## Learning Path
-
-New to ExRatatui? Follow this progression:
-
-1. **Run an example** — `mix run examples/hello_world.exs` to see it work
-2. **Read [Building UIs](guides/building_uis.md)** — widgets, layout, styles, and events
-3. **Read [Callback Runtime](guides/callback_runtime.md)** — build a supervised OTP app with `ExRatatui.App`
-4. **Try the counter** — `mix run examples/counter_app.exs` to see callbacks in action
-5. **(Optional)** Read [Reducer Runtime](guides/reducer_runtime.md) for async commands and subscriptions
-6. **Deploy remotely** — read the [SSH](guides/ssh_transport.md) or [Distribution](guides/distributed_transport.md) guide
+New here? The [Getting Started](guides/getting_started.md) guide builds a supervised todo app from `mix new` to a working TUI.
 
 ## Choosing a Runtime
 
@@ -179,12 +145,18 @@ All transports serve the same `ExRatatui.App` module — switch by changing a si
 
 | Guide | Description |
 |-------|-------------|
+| [Getting Started](guides/getting_started.md) | Walk-through from `mix new` to a supervised TUI — the place to start if you're new |
+| [Building UIs](guides/building_uis.md) | Widgets, layout, styles, rich text, and events — everything for `render/2` |
 | [Callback Runtime](guides/callback_runtime.md) | OTP-supervised apps with `mount`, `render`, `handle_event`, and `handle_info` callbacks |
 | [Reducer Runtime](guides/reducer_runtime.md) | Elm-style apps with `init`, `update`, `subscriptions`, commands, and runtime inspection |
-| [Building UIs](guides/building_uis.md) | Widgets, layout, styles, and events — everything for `render/2` |
 | [Custom Widgets](guides/custom_widgets.md) | Compose primitives into reusable widgets via the `ExRatatui.Widget` protocol |
+| [State Machine Patterns](guides/state_machines.md) | Multi-screen apps, modals, and conditional UI without the tangle |
+| [Testing](guides/testing.md) | Headless backend, `test_mode`, `inject_event`, and assertion patterns |
+| [Debugging](guides/debugging.md) | `Runtime.snapshot`, tracing, buffer inspection, and common errors |
+| [Performance](guides/performance.md) | Render-loop tuning, `render?: false`, large trees, async effects |
 | [Running TUIs over SSH](guides/ssh_transport.md) | Serve any app as a remote TUI over SSH, standalone or under `nerves_ssh` |
 | [Running TUIs over Erlang Distribution](guides/distributed_transport.md) | Drive a TUI from a remote BEAM node with zero NIF on the app side |
+| [Widgets Cheatsheet](guides/cheatsheets/widgets.cheatmd) | One-page reference with every struct and its key fields |
 
 ## How It Works
 
@@ -236,57 +208,7 @@ Distributed transport:
 
 All transports provide full session isolation — each connected client gets its own `Server` process with independent state.
 
-## Testing
-
-ExRatatui includes a headless test backend for CI-friendly rendering verification. Each test terminal is independent, and `test_mode` disables live terminal input polling so `async: true` tests do not race ambient TTY events:
-
-```elixir
-test "renders a paragraph" do
-  terminal = ExRatatui.init_test_terminal(40, 10)
-
-  paragraph = %Paragraph{text: "Hello!"}
-  :ok = ExRatatui.draw(terminal, [{paragraph, %Rect{x: 0, y: 0, width: 40, height: 10}}])
-
-  content = ExRatatui.get_buffer_content(terminal)
-  assert content =~ "Hello!"
-end
-```
-
-For supervised apps started under `test_mode`, use
-`ExRatatui.Runtime.inject_event/2` to drive input deterministically:
-
-```elixir
-{:ok, pid} = MyApp.TUI.start_link(name: nil, test_mode: {40, 10})
-
-event = %ExRatatui.Event.Key{code: "q", modifiers: [], kind: "press"}
-
-:ok = ExRatatui.Runtime.inject_event(pid, event)
-```
-
-## Troubleshooting
-
-**Terminal looks garbled or colors are wrong**
-Make sure your terminal emulator supports 256-color or true color. Most modern terminals (iTerm2, Ghostty, Alacritty, Windows Terminal, Kitty) work out of the box. If using `tmux` or `screen`, set `TERM=xterm-256color`.
-
-**SSH client hangs or shows no output**
-Connect with PTY allocation forced: `ssh -t user@host -p 2222`. Without `-t`, most SSH clients don't allocate a pseudo-terminal, and the TUI has nowhere to render. See the [SSH guide](guides/ssh_transport.md) for details.
-
-**`mix run examples/...` exits immediately**
-Make sure you're not piping or redirecting stdin. The TUI needs an interactive terminal to poll events. If running in a non-interactive context, use `--no-halt` for daemon-mode examples (SSH, distributed).
-
-**Tests fail with "terminal_init_failed"**
-This happens when a test tries to start a real terminal without a TTY (common in CI or when backgrounding). Use `test_mode: {width, height}` to start a headless test backend instead.
-
-**Debugging rendering issues**
-Use the headless test backend to inspect buffer contents:
-
-```elixir
-terminal = ExRatatui.init_test_terminal(80, 24)
-ExRatatui.draw(terminal, [{widget, rect}])
-IO.puts(ExRatatui.get_buffer_content(terminal))
-```
-
-For supervised apps, use `ExRatatui.Runtime.snapshot/1` to inspect runtime state and `ExRatatui.Runtime.enable_trace/2` to capture state transitions.
+For writing tests see the [Testing](guides/testing.md) guide; for runtime introspection and common errors see [Debugging](guides/debugging.md).
 
 ## Contributing
 
