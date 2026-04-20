@@ -2,6 +2,7 @@ defmodule ExRatatui.DistributedTest do
   use ExUnit.Case, async: true
 
   alias ExRatatui.{Distributed, Distributed.Listener}
+  alias ExRatatui.Test.ServerApps.FailingMount
 
   describe "ensure_connected/1" do
     test "returns error when trying to attach to self" do
@@ -88,29 +89,16 @@ defmodule ExRatatui.DistributedTest do
       # on a Listener with a failing mount app
       {:ok, listener} =
         Listener.start_link(
-          mod: FailingMountApp,
+          mod: FailingMount,
           name: nil
         )
 
       result =
         Listener.start_session(self(), 80, 24, listener)
 
-      assert {:error, _reason} = result
+      assert {:error, :mount_failed} = result
 
       Supervisor.stop(listener)
     end
-  end
-
-  defmodule FailingMountApp do
-    use ExRatatui.App
-
-    @impl true
-    def mount(_opts), do: {:error, :boom}
-
-    @impl true
-    def render(_state, _frame), do: []
-
-    @impl true
-    def handle_event(_event, state), do: {:noreply, state}
   end
 end

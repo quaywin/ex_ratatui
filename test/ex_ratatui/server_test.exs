@@ -5,65 +5,8 @@ defmodule ExRatatui.ServerTest do
 
   alias ExRatatui.Frame
   alias ExRatatui.Runtime
-
-  defmodule TestApp do
-    use ExRatatui.App
-
-    @impl true
-    def mount(opts) do
-      test_pid = Keyword.fetch!(opts, :test_pid)
-      send(test_pid, {:mounted, opts})
-      {:ok, %{test_pid: test_pid, render_count: 0}}
-    end
-
-    @impl true
-    def render(state, frame) do
-      send(state.test_pid, {:rendered, state.render_count, frame})
-      []
-    end
-
-    @impl true
-    def handle_event(event, state) do
-      send(state.test_pid, {:event, event})
-      {:noreply, state}
-    end
-
-    @impl true
-    def handle_info(msg, state) do
-      send(state.test_pid, {:info, msg})
-      {:noreply, state}
-    end
-  end
-
-  defmodule StopOnEventApp do
-    use ExRatatui.App
-
-    @impl true
-    def mount(opts) do
-      test_pid = Keyword.fetch!(opts, :test_pid)
-      {:ok, %{test_pid: test_pid}}
-    end
-
-    @impl true
-    def render(_state, _frame), do: []
-
-    @impl true
-    def handle_event(%{stop: true}, state), do: {:stop, state}
-    def handle_event(_event, state), do: {:noreply, state}
-  end
-
-  defmodule FailingMountApp do
-    use ExRatatui.App
-
-    @impl true
-    def mount(_opts), do: {:error, :mount_failed}
-
-    @impl true
-    def render(_state, _frame), do: []
-
-    @impl true
-    def handle_event(_event, state), do: {:noreply, state}
-  end
+  alias ExRatatui.Test.ServerApps.Echo, as: TestApp
+  alias ExRatatui.Test.ServerApps.{FailingMount, StopOnAnyEvent}
 
   defmodule RenderingApp do
     use ExRatatui.App
@@ -312,7 +255,7 @@ defmodule ExRatatui.ServerTest do
       capture_log(fn ->
         assert {:error, :mount_failed} =
                  ExRatatui.Server.start_link(
-                   mod: FailingMountApp,
+                   mod: FailingMount,
                    name: nil,
                    test_mode: {80, 24}
                  )
@@ -373,7 +316,7 @@ defmodule ExRatatui.ServerTest do
     end
 
     test "event dispatches to app module" do
-      state = build_server_state(TestApp, %{test_pid: self()})
+      state = build_server_state(TestApp, %{test_pid: self(), count: 0})
       event = %ExRatatui.Event.Key{code: "q", modifiers: [], kind: "press"}
       assert {:continue, _new_state, true} = ExRatatui.Server.handle_poll_result(event, state)
       assert_receive {:event, ^event}
@@ -382,7 +325,7 @@ defmodule ExRatatui.ServerTest do
 
   describe "dispatch_event/2" do
     test "noreply returns continue with render flag" do
-      state = build_server_state(TestApp, %{test_pid: self()})
+      state = build_server_state(TestApp, %{test_pid: self(), count: 0})
       event = %ExRatatui.Event.Key{code: "a", modifiers: [], kind: "press"}
       assert {:continue, new_state, true} = ExRatatui.Server.dispatch_event(state, event)
       assert_receive {:event, ^event}
@@ -390,7 +333,7 @@ defmodule ExRatatui.ServerTest do
     end
 
     test "stop returns stop tuple" do
-      state = build_server_state(StopOnEventApp, %{test_pid: self()})
+      state = build_server_state(StopOnAnyEvent, %{test_pid: self()})
       event = %{stop: true}
       assert {:stop, new_state} = ExRatatui.Server.dispatch_event(state, event)
       assert new_state.user_state == %{test_pid: self()}
@@ -414,7 +357,7 @@ defmodule ExRatatui.ServerTest do
 
       assert :ok = Runtime.inject_event(pid, event)
       assert_receive {:event, ^event}, 1000
-      assert_receive {:rendered, 0, %Frame{width: 80, height: 24}}, 1000
+      assert_receive {:rendered, 1, %Frame{width: 80, height: 24}}, 1000
 
       GenServer.stop(pid)
     end
@@ -422,7 +365,7 @@ defmodule ExRatatui.ServerTest do
     test "inject_event/2 can stop the server cleanly" do
       {:ok, pid} =
         ExRatatui.Server.start_link(
-          mod: StopOnEventApp,
+          mod: StopOnAnyEvent,
           name: nil,
           test_pid: self(),
           test_mode: {80, 24}

@@ -35,7 +35,12 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Test.PeerHelper,
           ExRatatui.Test.PeerRichApp,
           ExRatatui.Test.PeerWidgetsApp,
-          ExRatatui.Test.CrossTransportApp
+          ExRatatui.Test.CrossTransportApp,
+          # shared server test fixtures
+          ExRatatui.Test.ServerApps.Echo,
+          ExRatatui.Test.ServerApps.FailingMount,
+          ExRatatui.Test.ServerApps.StopOnAnyEvent,
+          ExRatatui.Test.SshHelper
         ]
       ],
       dialyzer: [
