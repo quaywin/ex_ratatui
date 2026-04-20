@@ -13,10 +13,16 @@ pub struct BarData {
     pub text_value: Option<String>,
 }
 
+pub struct BarGroupData {
+    pub label: Option<String>,
+    pub bars: Vec<BarData>,
+}
+
 pub struct BarChartData {
-    pub data: Vec<BarData>,
+    pub groups: Vec<BarGroupData>,
     pub bar_width: u16,
     pub bar_gap: u16,
+    pub group_gap: u16,
     pub bar_style: Style,
     pub value_style: Style,
     pub label_style: Style,
@@ -38,33 +44,41 @@ pub fn parse_direction(value: &str) -> Result<Direction, rustler::Error> {
 }
 
 pub fn render(buf: &mut Buffer, data: &BarChartData, area: Rect) {
-    let bars: Vec<Bar<'_>> = data
-        .data
-        .iter()
-        .map(|b| {
-            let mut bar = Bar::default()
-                .label(Line::from(b.label.clone()))
-                .value(b.value)
-                .style(b.style.unwrap_or(data.bar_style));
-
-            if let Some(ref text_value) = b.text_value {
-                bar = bar.text_value(text_value.clone());
-            }
-
-            bar
-        })
-        .collect();
-
-    let group = BarGroup::default().bars(&bars);
-
     let mut chart = BarChart::default()
-        .data(group)
         .bar_width(data.bar_width)
         .bar_gap(data.bar_gap)
+        .group_gap(data.group_gap)
         .bar_style(data.bar_style)
         .value_style(data.value_style)
         .label_style(data.label_style)
         .direction(data.direction);
+
+    for group_data in &data.groups {
+        let bars: Vec<Bar<'_>> = group_data
+            .bars
+            .iter()
+            .map(|b| {
+                let mut bar = Bar::default()
+                    .label(Line::from(b.label.clone()))
+                    .value(b.value)
+                    .style(b.style.unwrap_or(data.bar_style));
+
+                if let Some(ref text_value) = b.text_value {
+                    bar = bar.text_value(text_value.clone());
+                }
+
+                bar
+            })
+            .collect();
+
+        let mut group = BarGroup::default().bars(&bars);
+
+        if let Some(ref label) = group_data.label {
+            group = group.label(Line::from(label.clone()));
+        }
+
+        chart = chart.data(group);
+    }
 
     if let Some(max) = data.max {
         chart = chart.max(max);
@@ -94,10 +108,14 @@ mod tests {
         terminal
     }
 
+    fn anon_group(bars: Vec<BarData>) -> Vec<BarGroupData> {
+        vec![BarGroupData { label: None, bars }]
+    }
+
     #[test]
     fn renders_basic_vertical_chart_with_labels() {
         let data = BarChartData {
-            data: vec![
+            groups: anon_group(vec![
                 BarData {
                     label: "Elixir".to_string(),
                     value: 80,
@@ -110,9 +128,10 @@ mod tests {
                     style: None,
                     text_value: None,
                 },
-            ],
+            ]),
             bar_width: 6,
             bar_gap: 2,
+            group_gap: 0,
             bar_style: Style::default(),
             value_style: Style::default(),
             label_style: Style::default(),
@@ -130,14 +149,15 @@ mod tests {
     #[test]
     fn renders_horizontal_chart() {
         let data = BarChartData {
-            data: vec![BarData {
+            groups: anon_group(vec![BarData {
                 label: "Go".to_string(),
                 value: 60,
                 style: None,
                 text_value: None,
-            }],
+            }]),
             bar_width: 1,
             bar_gap: 0,
+            group_gap: 0,
             bar_style: Style::default(),
             value_style: Style::default(),
             label_style: Style::default(),
@@ -154,14 +174,15 @@ mod tests {
     #[test]
     fn auto_scales_when_max_is_none() {
         let data = BarChartData {
-            data: vec![BarData {
+            groups: anon_group(vec![BarData {
                 label: "Solo".to_string(),
                 value: 42,
                 style: None,
                 text_value: None,
-            }],
+            }]),
             bar_width: 4,
             bar_gap: 1,
+            group_gap: 0,
             bar_style: Style::default(),
             value_style: Style::default(),
             label_style: Style::default(),
@@ -172,16 +193,16 @@ mod tests {
 
         let terminal = render_to_terminal(&data, 10, 5);
         let line = buffer_line(&terminal, 4, 10);
-        // Bottom row should contain the label text
         assert!(line.contains("Solo"));
     }
 
     #[test]
     fn empty_data_renders_without_panic() {
         let data = BarChartData {
-            data: vec![],
+            groups: vec![],
             bar_width: 1,
             bar_gap: 1,
+            group_gap: 0,
             bar_style: Style::default(),
             value_style: Style::default(),
             label_style: Style::default(),
@@ -196,14 +217,15 @@ mod tests {
     #[test]
     fn text_value_replaces_numeric_display() {
         let data = BarChartData {
-            data: vec![BarData {
+            groups: anon_group(vec![BarData {
                 label: "Pct".to_string(),
                 value: 80,
                 style: None,
                 text_value: Some("80%".to_string()),
-            }],
+            }]),
             bar_width: 5,
             bar_gap: 0,
+            group_gap: 0,
             bar_style: Style::default(),
             value_style: Style::default(),
             label_style: Style::default(),
@@ -215,7 +237,6 @@ mod tests {
         let terminal = render_to_terminal(&data, 10, 5);
         let rendered = buffer_to_string(&terminal);
         assert!(rendered.contains("80%"));
-        // Raw "80" still appears inside "80%", so we can't assert against it.
     }
 
     #[test]
@@ -224,7 +245,7 @@ mod tests {
         let blue = Style::default().fg(Color::Blue);
 
         let data = BarChartData {
-            data: vec![
+            groups: anon_group(vec![
                 BarData {
                     label: "Default".to_string(),
                     value: 10,
@@ -237,9 +258,10 @@ mod tests {
                     style: Some(red),
                     text_value: None,
                 },
-            ],
+            ]),
             bar_width: 4,
             bar_gap: 1,
+            group_gap: 0,
             bar_style: blue,
             value_style: Style::default(),
             label_style: Style::default(),
@@ -251,8 +273,6 @@ mod tests {
         let terminal = render_to_terminal(&data, 12, 6);
         let buffer = terminal.backend().buffer();
 
-        // With bar_width 4 and gap 1, bar 0 spans x=0..=3 and bar 1 spans x=5..=8.
-        // The bar cells sit above the label/value rows at the bottom.
         let bar_one_fg = buffer.cell((0, 0)).unwrap().fg;
         let bar_two_fg = buffer.cell((5, 0)).unwrap().fg;
 
@@ -263,14 +283,15 @@ mod tests {
     #[test]
     fn renders_with_block_title() {
         let data = BarChartData {
-            data: vec![BarData {
+            groups: anon_group(vec![BarData {
                 label: "A".to_string(),
                 value: 1,
                 style: None,
                 text_value: None,
-            }],
+            }]),
             bar_width: 1,
             bar_gap: 0,
+            group_gap: 0,
             bar_style: Style::default(),
             value_style: Style::default(),
             label_style: Style::default(),
@@ -289,6 +310,62 @@ mod tests {
         let terminal = render_to_terminal(&data, 20, 5);
         let rendered = buffer_to_string(&terminal);
         assert!(rendered.contains("Traffic"));
+    }
+
+    #[test]
+    fn renders_grouped_bars_with_group_labels() {
+        let data = BarChartData {
+            groups: vec![
+                BarGroupData {
+                    label: Some("Q1".to_string()),
+                    bars: vec![
+                        BarData {
+                            label: "A".to_string(),
+                            value: 10,
+                            style: None,
+                            text_value: None,
+                        },
+                        BarData {
+                            label: "B".to_string(),
+                            value: 20,
+                            style: None,
+                            text_value: None,
+                        },
+                    ],
+                },
+                BarGroupData {
+                    label: Some("Q2".to_string()),
+                    bars: vec![
+                        BarData {
+                            label: "A".to_string(),
+                            value: 15,
+                            style: None,
+                            text_value: None,
+                        },
+                        BarData {
+                            label: "B".to_string(),
+                            value: 25,
+                            style: None,
+                            text_value: None,
+                        },
+                    ],
+                },
+            ],
+            bar_width: 3,
+            bar_gap: 1,
+            group_gap: 3,
+            bar_style: Style::default(),
+            value_style: Style::default(),
+            label_style: Style::default(),
+            max: Some(30),
+            direction: Direction::Vertical,
+            block: None,
+        };
+
+        let terminal = render_to_terminal(&data, 40, 10);
+        let rendered = buffer_to_string(&terminal);
+        assert!(rendered.contains("Q1"));
+        assert!(rendered.contains("Q2"));
     }
 
     #[test]

@@ -8,11 +8,23 @@ defmodule ExRatatui.Widgets.BarChart do
   override their color via their own `:style` field, or replace the numeric
   display via `:text_value`.
 
+  ## Grouped bars
+
+  Use `:groups` instead of `:data` to render side-by-side clusters of bars
+  with a shared caption — handy when comparing the same metrics across
+  categories (months, products, regions). Each entry is a
+  `%ExRatatui.Widgets.BarGroup{label, bars}`; `:group_gap` controls the
+  spacing between clusters.
+
+  Set either `:data` or `:groups`, not both.
+
   ## Fields
 
-    * `:data` - list of `%ExRatatui.Widgets.Bar{}` (required; may be empty)
+    * `:data` - list of `%ExRatatui.Widgets.Bar{}` (default `[]`); rendered as a single anonymous group
+    * `:groups` - list of `%ExRatatui.Widgets.BarGroup{}` for multi-cluster charts (default `[]`)
     * `:bar_width` - width (vertical) or height (horizontal) of each bar in cells; default `1`
     * `:bar_gap` - cells between adjacent bars; default `1`
+    * `:group_gap` - cells between adjacent groups when `:groups` is used; default `0`
     * `:bar_style` - shared `%ExRatatui.Style{}` applied to bars without a per-bar override
     * `:value_style` - `%ExRatatui.Style{}` for the numeric value text
     * `:label_style` - `%ExRatatui.Style{}` for bar labels
@@ -29,8 +41,10 @@ defmodule ExRatatui.Widgets.BarChart do
           %ExRatatui.Widgets.Bar{label: "Elixir", value: 80, style: nil, text_value: nil},
           %ExRatatui.Widgets.Bar{label: "Rust", value: 95, style: nil, text_value: nil}
         ],
+        groups: [],
         bar_width: 1,
         bar_gap: 1,
+        group_gap: 0,
         bar_style: %ExRatatui.Style{},
         value_style: %ExRatatui.Style{},
         label_style: %ExRatatui.Style{},
@@ -44,8 +58,10 @@ defmodule ExRatatui.Widgets.BarChart do
 
   @type t :: %__MODULE__{
           data: [ExRatatui.Widgets.Bar.t()],
+          groups: [ExRatatui.Widgets.BarGroup.t()],
           bar_width: pos_integer(),
           bar_gap: non_neg_integer(),
+          group_gap: non_neg_integer(),
           bar_style: ExRatatui.Style.t(),
           value_style: ExRatatui.Style.t(),
           label_style: ExRatatui.Style.t(),
@@ -55,8 +71,10 @@ defmodule ExRatatui.Widgets.BarChart do
         }
 
   defstruct data: [],
+            groups: [],
             bar_width: 1,
             bar_gap: 1,
+            group_gap: 0,
             bar_style: %ExRatatui.Style{},
             value_style: %ExRatatui.Style{},
             label_style: %ExRatatui.Style{},

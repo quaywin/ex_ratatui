@@ -15,6 +15,7 @@ defmodule ExRatatui.Bridge do
   alias ExRatatui.Widgets.{
     Bar,
     BarChart,
+    BarGroup,
     Block,
     Calendar,
     Canvas,
@@ -144,11 +145,16 @@ defmodule ExRatatui.Bridge do
             "bar_chart.direction expected :vertical or :horizontal, got: #{inspect(chart.direction)}"
     end
 
+    validate_bar_chart_group_gap!(chart.group_gap)
+
+    groups = encode_bar_groups(chart.data, chart.groups)
+
     %{
       "type" => "bar_chart",
-      "data" => encode_bars(chart.data),
+      "groups" => groups,
       "bar_width" => chart.bar_width,
       "bar_gap" => chart.bar_gap,
+      "group_gap" => chart.group_gap,
       "bar_style" => encode_style(chart.bar_style, "bar_chart.bar_style"),
       "value_style" => encode_style(chart.value_style, "bar_chart.value_style"),
       "label_style" => encode_style(chart.label_style, "bar_chart.label_style"),
@@ -385,6 +391,35 @@ defmodule ExRatatui.Bridge do
     raise ArgumentError, "unsupported widget struct: #{inspect(widget)}"
   end
 
+  defp encode_bar_groups(_data, groups) when not is_list(groups) do
+    raise ArgumentError,
+          "bar_chart.groups expected a list of %BarGroup{}, got: #{inspect(groups)}"
+  end
+
+  defp encode_bar_groups(_data, [_ | _] = groups) do
+    Enum.map(groups, &encode_bar_group/1)
+  end
+
+  defp encode_bar_groups(data, []), do: [%{"bars" => encode_bars(data)}]
+
+  defp encode_bar_group(%BarGroup{bars: bars} = group) when is_list(bars) do
+    %{"bars" => encode_bars(bars)}
+    |> maybe_put("label", encode_bar_group_label(group.label))
+  end
+
+  defp encode_bar_group(other) do
+    raise ArgumentError,
+          "bar_chart.groups expected entries to be %BarGroup{}, got: #{inspect(other)}"
+  end
+
+  defp encode_bar_group_label(nil), do: nil
+  defp encode_bar_group_label(binary) when is_binary(binary), do: binary
+
+  defp encode_bar_group_label(other) do
+    raise ArgumentError,
+          "bar_chart.groups label expected a string or nil, got: #{inspect(other)}"
+  end
+
   defp encode_bars(bars) when is_list(bars), do: Enum.map(bars, &encode_bar/1)
 
   defp encode_bars(other) do
@@ -404,6 +439,13 @@ defmodule ExRatatui.Bridge do
 
   defp encode_bar(other) do
     raise ArgumentError, "bar_chart.data expected a list of %Bar{}, got entry: #{inspect(other)}"
+  end
+
+  defp validate_bar_chart_group_gap!(value) when is_integer(value) and value >= 0, do: :ok
+
+  defp validate_bar_chart_group_gap!(other) do
+    raise ArgumentError,
+          "bar_chart.group_gap expected a non-negative integer, got: #{inspect(other)}"
   end
 
   defp encode_sparkline_data(data) when is_list(data),

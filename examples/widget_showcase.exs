@@ -14,6 +14,7 @@ alias ExRatatui.Style
 alias ExRatatui.Widgets.{
   Bar,
   BarChart,
+  BarGroup,
   Block,
   Calendar,
   Canvas,

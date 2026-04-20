@@ -12,7 +12,7 @@ use crate::terminal::{with_terminal_draw, TerminalResource};
 use crate::text;
 use crate::text_input::{self, TextInputRenderData, TextInputResource, TextInputState};
 use crate::textarea::{self, TextareaRenderData, TextareaResource};
-use crate::widgets::bar_chart::{self, BarChartData, BarData};
+use crate::widgets::bar_chart::{self, BarChartData, BarData, BarGroupData};
 use crate::widgets::block::{self, BlockData};
 use crate::widgets::calendar::{self, CalendarData};
 use crate::widgets::canvas::{self, CanvasData, CanvasShape};
@@ -405,19 +405,20 @@ fn decode_line_gauge(map: &TermMap<'_>) -> Result<LineGaugeData, Error> {
 }
 
 fn decode_bar_chart(map: &TermMap<'_>) -> Result<BarChartData, Error> {
-    let data_term = optional_term(map, "data")
-        .ok_or_else(|| crate::decode::missing_field("bar_chart", "data"))?;
-    let bar_terms: Vec<Term<'_>> = data_term
+    let groups_term = optional_term(map, "groups")
+        .ok_or_else(|| crate::decode::missing_field("bar_chart", "groups"))?;
+    let group_terms: Vec<Term<'_>> = groups_term
         .decode()
-        .map_err(|_| invalid_field("bar_chart", "data", "expected a list"))?;
+        .map_err(|_| invalid_field("bar_chart", "groups", "expected a list"))?;
 
-    let data: Vec<BarData> = bar_terms
+    let groups: Vec<BarGroupData> = group_terms
         .into_iter()
-        .map(decode_bar)
+        .map(decode_bar_group)
         .collect::<Result<_, _>>()?;
 
     let bar_width: u16 = decode_optional(map, "bar_width", "bar_chart")?.unwrap_or(1);
     let bar_gap: u16 = decode_optional(map, "bar_gap", "bar_chart")?.unwrap_or(1);
+    let group_gap: u16 = decode_optional(map, "group_gap", "bar_chart")?.unwrap_or(0);
 
     let bar_style = match optional_term(map, "bar_style") {
         Some(term) => decode_style(term)?,
@@ -443,9 +444,10 @@ fn decode_bar_chart(map: &TermMap<'_>) -> Result<BarChartData, Error> {
     let block = decode_optional_block(map)?;
 
     Ok(BarChartData {
-        data,
+        groups,
         bar_width,
         bar_gap,
+        group_gap,
         bar_style,
         value_style,
         label_style,
@@ -453,6 +455,24 @@ fn decode_bar_chart(map: &TermMap<'_>) -> Result<BarChartData, Error> {
         direction,
         block,
     })
+}
+
+fn decode_bar_group(term: Term<'_>) -> Result<BarGroupData, Error> {
+    let map = decode_map(term, "bar_chart.groups")?;
+    let label: Option<String> = decode_optional(&map, "label", "bar_chart.groups")?;
+
+    let bars_term = optional_term(&map, "bars")
+        .ok_or_else(|| crate::decode::missing_field("bar_chart.groups", "bars"))?;
+    let bar_terms: Vec<Term<'_>> = bars_term
+        .decode()
+        .map_err(|_| invalid_field("bar_chart.groups", "bars", "expected a list"))?;
+
+    let bars: Vec<BarData> = bar_terms
+        .into_iter()
+        .map(decode_bar)
+        .collect::<Result<_, _>>()?;
+
+    Ok(BarGroupData { label, bars })
 }
 
 fn decode_bar(term: Term<'_>) -> Result<BarData, Error> {

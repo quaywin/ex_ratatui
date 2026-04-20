@@ -241,7 +241,28 @@ alias ExRatatui.Widgets.{Bar, BarChart}
 }
 ```
 
-Values must be non-negative integers — floats or negatives raise `ArgumentError` at encode time. Grouped bars (multiple `BarGroup`s) are not supported yet; a single flat list is rendered as one group.
+Values must be non-negative integers — floats or negatives raise `ArgumentError` at encode time.
+
+#### Grouped bars
+
+To render side-by-side clusters with shared captions — handy for comparing the same metric across categories (months, regions, products) — pass `%BarGroup{}` entries via `:groups` instead of `:data`. Each group carries its own optional `:label` and a list of `%Bar{}` structs, and `:group_gap` controls the spacing between clusters.
+
+```elixir
+alias ExRatatui.Widgets.{Bar, BarChart, BarGroup}
+
+%BarChart{
+  groups: [
+    %BarGroup{label: "Q1", bars: [%Bar{label: "A", value: 10}, %Bar{label: "B", value: 20}]},
+    %BarGroup{label: "Q2", bars: [%Bar{label: "A", value: 15}, %Bar{label: "B", value: 25}]}
+  ],
+  bar_width: 3,
+  bar_gap: 1,
+  group_gap: 3,
+  max: 30
+}
+```
+
+Set either `:data` or `:groups`, not both. When `:data` is used, the chart renders as a single anonymous group; supplying `:groups` overrides it. `:group_gap` must be a non-negative integer, and each entry in `:groups` must be a `%BarGroup{}` whose `:label` is `nil` or a binary — anything else raises `ArgumentError` at encode time.
 
 ### Sparkline
 

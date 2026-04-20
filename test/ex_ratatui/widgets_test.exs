@@ -8,6 +8,7 @@ defmodule ExRatatui.WidgetsTest do
   alias ExRatatui.Widgets.{
     Bar,
     BarChart,
+    BarGroup,
     Block,
     Calendar,
     Canvas,
@@ -659,11 +660,100 @@ defmodule ExRatatui.WidgetsTest do
     test "bar_chart struct has correct defaults" do
       chart = %BarChart{}
       assert chart.data == []
+      assert chart.groups == []
       assert chart.bar_width == 1
       assert chart.bar_gap == 1
+      assert chart.group_gap == 0
       assert chart.max == nil
       assert chart.direction == :vertical
       assert chart.block == nil
+    end
+
+    test "bar_group struct has correct defaults" do
+      group = %BarGroup{}
+      assert group.label == nil
+      assert group.bars == []
+    end
+
+    test "bar_chart encodes :data as a single anonymous group", %{terminal: terminal} do
+      chart = %BarChart{data: [%Bar{label: "Elixir", value: 80}]}
+      rect = %Rect{x: 0, y: 0, width: 30, height: 5}
+
+      assert :ok = ExRatatui.draw(terminal, [{chart, rect}])
+    end
+
+    test "bar_chart accepts a BarGroup with nil label (label key omitted)", %{
+      terminal: terminal
+    } do
+      chart = %BarChart{
+        groups: [%BarGroup{label: nil, bars: [%Bar{label: "A", value: 10}]}]
+      }
+
+      rect = %Rect{x: 0, y: 0, width: 20, height: 5}
+
+      assert :ok = ExRatatui.draw(terminal, [{chart, rect}])
+    end
+
+    test "bar_chart renders explicit groups with labels", %{terminal: terminal} do
+      chart = %BarChart{
+        groups: [
+          %BarGroup{
+            label: "Q1",
+            bars: [%Bar{label: "A", value: 10}, %Bar{label: "B", value: 20}]
+          },
+          %BarGroup{
+            label: "Q2",
+            bars: [%Bar{label: "A", value: 15}, %Bar{label: "B", value: 25}]
+          }
+        ],
+        bar_width: 3,
+        bar_gap: 1,
+        group_gap: 3,
+        max: 30
+      }
+
+      rect = %Rect{x: 0, y: 0, width: 50, height: 10}
+
+      assert :ok = ExRatatui.draw(terminal, [{chart, rect}])
+      content = ExRatatui.get_buffer_content(terminal)
+      assert content =~ "Q1"
+      assert content =~ "Q2"
+    end
+
+    test "bar_chart rejects non-list :groups" do
+      chart = %BarChart{groups: "not a list"}
+      rect = %Rect{x: 0, y: 0, width: 10, height: 4}
+
+      assert_raise ArgumentError, ~r/list of %BarGroup\{\}/, fn ->
+        ExRatatui.Bridge.encode_commands!([{chart, rect}])
+      end
+    end
+
+    test "bar_chart rejects non-BarGroup entry in :groups" do
+      chart = %BarChart{groups: [{:not_a_group}]}
+      rect = %Rect{x: 0, y: 0, width: 10, height: 4}
+
+      assert_raise ArgumentError, ~r/entries to be %BarGroup\{\}/, fn ->
+        ExRatatui.Bridge.encode_commands!([{chart, rect}])
+      end
+    end
+
+    test "bar_chart rejects non-string group label" do
+      chart = %BarChart{groups: [%BarGroup{label: 123, bars: []}]}
+      rect = %Rect{x: 0, y: 0, width: 10, height: 4}
+
+      assert_raise ArgumentError, ~r/label expected a string or nil/, fn ->
+        ExRatatui.Bridge.encode_commands!([{chart, rect}])
+      end
+    end
+
+    test "bar_chart rejects negative group_gap" do
+      chart = %BarChart{group_gap: -1}
+      rect = %Rect{x: 0, y: 0, width: 10, height: 4}
+
+      assert_raise ArgumentError, ~r/group_gap expected a non-negative integer/, fn ->
+        ExRatatui.Bridge.encode_commands!([{chart, rect}])
+      end
     end
 
     test "bar_chart rejects negative bar value" do
