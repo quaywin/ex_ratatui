@@ -50,7 +50,13 @@ defmodule ExRatatui.Distributed.ClientTest do
     end
 
     test "without test_mode live polling stays enabled" do
-      {:ok, pid} = Client.start_link(init_terminal: fn _test_mode -> make_ref() end)
+      # Inject a real test terminal ref so termination can cleanly restore it —
+      # the thing under test is `polling_enabled?`, which is driven by the
+      # *absence* of test_mode opts, not by the terminal ref itself.
+      {:ok, pid} =
+        Client.start_link(
+          init_terminal: fn _test_mode -> ExRatatui.init_test_terminal(80, 24) end
+        )
 
       state = :sys.get_state(pid)
       assert state.polling_enabled?

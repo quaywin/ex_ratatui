@@ -69,6 +69,39 @@ defmodule ExRatatui.Server.DistributedTransportTest do
     end
   end
 
+  # An Echo variant that renders a TextInput + Textarea so the "stateful
+  # widgets are snapshot before distribution" test can verify the server
+  # snapshots NIF references into plain tuples.
+  defmodule DistStatefulApp do
+    use ExRatatui.App
+
+    @impl true
+    def mount(opts) do
+      test_pid = Keyword.fetch!(opts, :test_pid)
+      ti_state = ExRatatui.text_input_new()
+      ExRatatui.text_input_set_value(ti_state, "hello")
+      ta_state = ExRatatui.textarea_new()
+      ExRatatui.textarea_set_value(ta_state, "line1\nline2")
+      send(test_pid, {:mounted, opts})
+      {:ok, %{test_pid: test_pid, ti: ti_state, ta: ta_state}}
+    end
+
+    @impl true
+    def render(state, frame) do
+      send(state.test_pid, :rendered)
+
+      [
+        {%ExRatatui.Widgets.TextInput{state: state.ti},
+         %Rect{x: 0, y: 0, width: frame.width, height: 1}},
+        {%ExRatatui.Widgets.Textarea{state: state.ta},
+         %Rect{x: 0, y: 1, width: frame.width, height: frame.height - 1}}
+      ]
+    end
+
+    @impl true
+    def handle_event(_event, state), do: {:noreply, state}
+  end
+
   describe "lifecycle" do
     test "start_link with {:distributed_server, ...} mounts and sends widgets to client" do
       {:ok, pid} =
@@ -328,38 +361,6 @@ defmodule ExRatatui.Server.DistributedTransportTest do
     end
 
     test "stateful widgets are snapshot before distribution" do
-      # An Echo variant that renders a TextInput + Textarea so we can
-      # verify the server snapshots NIF references into plain tuples.
-      defmodule DistStatefulApp do
-        use ExRatatui.App
-
-        @impl true
-        def mount(opts) do
-          test_pid = Keyword.fetch!(opts, :test_pid)
-          ti_state = ExRatatui.text_input_new()
-          ExRatatui.text_input_set_value(ti_state, "hello")
-          ta_state = ExRatatui.textarea_new()
-          ExRatatui.textarea_set_value(ta_state, "line1\nline2")
-          send(test_pid, {:mounted, opts})
-          {:ok, %{test_pid: test_pid, ti: ti_state, ta: ta_state}}
-        end
-
-        @impl true
-        def render(state, frame) do
-          send(state.test_pid, :rendered)
-
-          [
-            {%ExRatatui.Widgets.TextInput{state: state.ti},
-             %Rect{x: 0, y: 0, width: frame.width, height: 1}},
-            {%ExRatatui.Widgets.Textarea{state: state.ta},
-             %Rect{x: 0, y: 1, width: frame.width, height: frame.height - 1}}
-          ]
-        end
-
-        @impl true
-        def handle_event(_event, state), do: {:noreply, state}
-      end
-
       {:ok, pid} =
         ExRatatui.Server.start_link(
           mod: DistStatefulApp,
