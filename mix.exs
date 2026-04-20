@@ -123,7 +123,6 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Runtime
         ],
         "SSH Transport": [
-          ExRatatui.Session,
           ExRatatui.SSH,
           ExRatatui.SSH.Daemon
         ],
@@ -136,6 +135,12 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Layout,
           ExRatatui.Layout.Rect
         ],
+        Events: [
+          ExRatatui.Event,
+          ExRatatui.Event.Key,
+          ExRatatui.Event.Mouse,
+          ExRatatui.Event.Resize
+        ],
         Widgets: [
           ExRatatui.Widgets.Paragraph,
           ExRatatui.Widgets.Block,
@@ -143,8 +148,6 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Widgets.Table,
           ExRatatui.Widgets.Gauge,
           ExRatatui.Widgets.LineGauge,
-          ExRatatui.Widgets.BarChart,
-          ExRatatui.Widgets.Bar,
           ExRatatui.Widgets.Sparkline,
           ExRatatui.Widgets.Calendar,
           ExRatatui.Widgets.Tabs,
@@ -160,22 +163,38 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Widgets.SlashCommands,
           ExRatatui.Widgets.SlashCommands.Command
         ],
-        Events: [
-          ExRatatui.Event,
-          ExRatatui.Event.Key,
-          ExRatatui.Event.Mouse,
-          ExRatatui.Event.Resize
+        "Widgets: Bar Chart": [
+          ExRatatui.Widgets.BarChart,
+          ExRatatui.Widgets.Bar,
+          ExRatatui.Widgets.BarGroup
+        ],
+        "Widgets: Chart": [
+          ExRatatui.Widgets.Chart,
+          ExRatatui.Widgets.Chart.Axis,
+          ExRatatui.Widgets.Chart.Dataset
+        ],
+        "Widgets: Canvas": [
+          ExRatatui.Widgets.Canvas,
+          ExRatatui.Widgets.Canvas.Circle,
+          ExRatatui.Widgets.Canvas.Label,
+          ExRatatui.Widgets.Canvas.Line,
+          ExRatatui.Widgets.Canvas.Map,
+          ExRatatui.Widgets.Canvas.Points,
+          ExRatatui.Widgets.Canvas.Rectangle
+        ],
+        "Custom Widgets": [
+          ExRatatui.Widget
+        ],
+        "Rich Text": [
+          ExRatatui.Text,
+          ExRatatui.Text.Line,
+          ExRatatui.Text.Span
         ],
         Focus: [
           ExRatatui.Focus
         ],
         Style: [
           ExRatatui.Style
-        ],
-        "Rich Text": [
-          ExRatatui.Text,
-          ExRatatui.Text.Line,
-          ExRatatui.Text.Span
         ]
       ]
     ]
