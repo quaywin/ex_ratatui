@@ -34,7 +34,8 @@ defmodule ExRatatui.MixProject do
           ExRatatui.Test.PeerApp,
           ExRatatui.Test.PeerHelper,
           ExRatatui.Test.PeerRichApp,
-          ExRatatui.Test.PeerWidgetsApp
+          ExRatatui.Test.PeerWidgetsApp,
+          ExRatatui.Test.CrossTransportApp
         ]
       ],
       dialyzer: [
