@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-21
+
 ### Added
 
 - **Chart widget** — new `ExRatatui.Widgets.Chart` struct plus `Chart.Dataset` and `Chart.Axis` companions wrap ratatui's `Chart` for x/y line, scatter, and bar plots with axes, labels, legend, and multi-series support. Each `%Dataset{}` carries a `:name` (shown in the legend), a list of `{x, y}` numeric tuples in `:data`, plus its own `:marker` (`:braille` / `:dot` / `:block` / `:bar` / `:half_block`), `:graph_type` (`:line` / `:scatter` / `:bar`), and `:style`, so a single chart can mix line and scatter overlays. The required `:x_axis` / `:y_axis` are `%Axis{}` structs with `:bounds` (`{min, max}` numeric tuple), optional tick `:labels` (string / `%Span{}` / `%Line{}`), `:title`, `:style`, and `:labels_alignment` (`:left` / `:center` / `:right`). `:legend_position` accepts `:top`, `:top_left`, `:top_right` (default), `:bottom`, `:bottom_left`, `:bottom_right`, `:left`, `:right`, or `nil` to hide the legend entirely. `:hidden_legend_constraints` takes a `{width_constraint, height_constraint}` pair using the same shapes as `ExRatatui.Layout` (`:length` / `:percentage` / `:ratio` / `:min` / `:max` / `:fill`) — the legend is hidden whenever its rendered size would exceed those bounds against the chart area. `:block` wraps the chart in a framed `Block`. Missing axes, non-list `:datasets`, non-`%Dataset{}` entries, malformed data points, non-numeric coordinates, unknown markers, unknown `:graph_type`s, unknown `:legend_position`s, malformed `:bounds`, malformed `:hidden_legend_constraints`, and unknown `:labels_alignment` values raise `ArgumentError` at the bridge boundary. See the [Chart section](guides/building_uis.md#chart) in Building UIs and the widget cheatsheet for examples
@@ -309,7 +311,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/mcass19/ex_ratatui/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/mcass19/ex_ratatui/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/mcass19/ex_ratatui/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/mcass19/ex_ratatui/compare/v0.6.1...v0.6.2
