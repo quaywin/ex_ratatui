@@ -13,7 +13,8 @@ Two categories, all prefixed with `:ex_ratatui`. **Span events** wrap something 
 | `[:ex_ratatui, :runtime, :update]` | span | Info message → `handle_info/2` (subscriptions, async results, user sends) | `:mod`, `:transport`, `:msg` |
 | `[:ex_ratatui, :render, :frame]` | span | Frame build + draw | `:mod`, `:transport`, `:widget_count` (on `:stop`) |
 | `[:ex_ratatui, :transport, :connect]` | span | Transport handshake at server start | `:mod`, `:transport` |
-| `[:ex_ratatui, :session, :lifecycle]` | span | `ExRatatui.Session.new/2` and `close/1` | `:action` (`:open` \| `:close`) |
+| `[:ex_ratatui, :session, :lifecycle, :open]` | single | Session-backed runtime adopts a session | `:mod`, `:transport`, `:width`, `:height` |
+| `[:ex_ratatui, :session, :lifecycle, :close]` | single | Session-backed runtime releases its session (fires once per session even when the transport's own teardown closes the ref defensively) | `:mod`, `:transport`, `:reason` |
 | `[:ex_ratatui, :render, :dropped]` | single | Frame skipped (draw error, future backpressure) | `:mod`, `:transport`, `:reason` |
 | `[:ex_ratatui, :transport, :disconnect]` | single | Server `terminate/2` | `:mod`, `:transport`, `:reason` |
 

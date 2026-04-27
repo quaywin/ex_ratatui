@@ -147,6 +147,12 @@ defmodule ExRatatui.Server do
         Session.size(session)
       end)
 
+    Telemetry.execute(
+      [:session, :lifecycle, :open],
+      %{},
+      %{mod: mod, transport: :session, width: w, height: h}
+    )
+
     augmented_opts = augment_session_mount_opts(opts, w, h)
 
     mount_result =
@@ -180,6 +186,12 @@ defmodule ExRatatui.Server do
         {:ok, state}
 
       {:error, reason} ->
+        Telemetry.execute(
+          [:session, :lifecycle, :close],
+          %{},
+          %{mod: mod, transport: :session, reason: reason}
+        )
+
         Session.close(session)
         {:stop, reason}
     end
@@ -349,6 +361,13 @@ defmodule ExRatatui.Server do
 
   def terminate(reason, %__MODULE__{transport: :session, terminal_initialized: true} = state) do
     cancel_subscription_timers(state)
+
+    Telemetry.execute(
+      [:session, :lifecycle, :close],
+      %{},
+      %{mod: state.mod, transport: state.transport, reason: reason}
+    )
+
     Session.close(state.session)
     state.mod.terminate(reason, state.user_state)
     emit_transport_disconnect(state, reason)

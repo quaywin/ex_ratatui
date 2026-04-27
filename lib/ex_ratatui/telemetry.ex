@@ -25,7 +25,6 @@ defmodule ExRatatui.Telemetry do
   | `[:ex_ratatui, :runtime, :update]` | Info-message dispatch (subscriptions, async results, user `handle_info/2`). | `:mod`, `:transport`, `:msg` |
   | `[:ex_ratatui, :render, :frame]` | Frame build + draw cycle. | `:mod`, `:transport`, `:widget_count` |
   | `[:ex_ratatui, :transport, :connect]` | Transport wiring for a session (terminal init, SSH session bind, distributed client monitor). | `:mod`, `:transport` |
-  | `[:ex_ratatui, :session, :lifecycle]` | Session buffer open/close. | `:action` (`:open` \| `:close`) |
 
   `:start` events carry `%{monotonic_time: integer, system_time: integer}`
   as measurements. `:stop` events add `:duration` (native units). On
@@ -35,6 +34,8 @@ defmodule ExRatatui.Telemetry do
 
   | Event | Description | Measurements | Metadata |
   | ----- | ----------- | ------------ | -------- |
+  | `[:ex_ratatui, :session, :lifecycle, :open]` | A session-backed runtime adopted a session. | `%{system_time: integer}` | `:mod`, `:transport`, `:width`, `:height` |
+  | `[:ex_ratatui, :session, :lifecycle, :close]` | A session-backed runtime released its session. Fires exactly once per session even when transport-level cleanup also closes the session ref. | `%{system_time: integer}` | `:mod`, `:transport`, `:reason` |
   | `[:ex_ratatui, :render, :dropped]` | A frame was skipped (draw error or future backpressure). | `%{system_time: integer}` | `:mod`, `:transport`, `:reason` |
   | `[:ex_ratatui, :transport, :disconnect]` | Session tore down. | `%{system_time: integer}` | `:mod`, `:transport`, `:reason` |
 
@@ -136,8 +137,8 @@ defmodule ExRatatui.Telemetry do
       [:ex_ratatui, :transport, :connect, :stop],
       [:ex_ratatui, :transport, :connect, :exception],
       [:ex_ratatui, :transport, :disconnect],
-      [:ex_ratatui, :session, :lifecycle, :stop],
-      [:ex_ratatui, :session, :lifecycle, :exception]
+      [:ex_ratatui, :session, :lifecycle, :open],
+      [:ex_ratatui, :session, :lifecycle, :close]
     ]
   end
 end

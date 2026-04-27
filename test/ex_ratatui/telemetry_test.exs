@@ -1,5 +1,10 @@
 defmodule ExRatatui.TelemetryTest do
-  use ExUnit.Case, async: true
+  # async: false because the new session-lifecycle tests use refute_receive
+  # to assert exactly-one :close semantics, which is fragile under cross-test
+  # mailbox pollution: telemetry handlers register globally, so a concurrent
+  # `:session` Server starting/stopping in another async test would deliver
+  # a matching event into this test's mailbox and trip the refute.
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 
@@ -7,6 +12,7 @@ defmodule ExRatatui.TelemetryTest do
   alias ExRatatui.Session
   alias ExRatatui.Telemetry
   alias ExRatatui.Test.ServerApps.Echo, as: TestApp
+  alias ExRatatui.Test.ServerApps.FailingMount
 
   # Attaches a self-forwarding handler for each event in `events` under a
   # unique id scoped to the test pid, and detaches on_exit.
@@ -87,33 +93,94 @@ defmodule ExRatatui.TelemetryTest do
   end
 
   describe "session lifecycle" do
-    test "emits :open span on Session.new/2" do
+    test "Session.new/2 and Session.close/1 emit nothing on their own" do
       capture([
-        [:ex_ratatui, :session, :lifecycle, :start],
-        [:ex_ratatui, :session, :lifecycle, :stop]
+        [:ex_ratatui, :session, :lifecycle, :open],
+        [:ex_ratatui, :session, :lifecycle, :close]
       ])
-
-      session = Session.new(10, 5)
-      on_exit(fn -> Session.close(session) end)
-
-      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :start], _,
-                      %{action: :open, width: 10, height: 5}}
-
-      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :stop], %{duration: _},
-                      %{action: :open}}
-    end
-
-    test "emits :close span on Session.close/1" do
-      capture([[:ex_ratatui, :session, :lifecycle, :stop]])
 
       session = Session.new(10, 5)
       :ok = Session.close(session)
 
-      # drain the :open stop first
-      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :stop], _, %{action: :open}}
+      # Lifecycle is owned by the runtime, not the Session resource — bare
+      # Session.new/close calls outside a Server must not emit anything.
+      refute_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :open], _, _}
+      refute_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :close], _, _}
+    end
 
-      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :stop], _,
-                      %{action: :close}}
+    test "Server start_link with :session transport emits :open" do
+      capture([[:ex_ratatui, :session, :lifecycle, :open]])
+
+      session = Session.new(40, 10)
+      writer_fn = fn _bytes -> :ok end
+
+      {:ok, pid} =
+        ExRatatui.Server.start_link(
+          mod: TestApp,
+          name: nil,
+          test_pid: self(),
+          transport: {:session, session, writer_fn}
+        )
+
+      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :open], measurements,
+                      %{mod: TestApp, transport: :session, width: 40, height: 10}}
+
+      assert is_integer(measurements.system_time)
+
+      GenServer.stop(pid)
+    end
+
+    test "Server terminate with :session transport emits exactly one :close" do
+      capture([[:ex_ratatui, :session, :lifecycle, :close]])
+
+      session = Session.new(40, 10)
+      writer_fn = fn _bytes -> :ok end
+
+      {:ok, pid} =
+        ExRatatui.Server.start_link(
+          mod: TestApp,
+          name: nil,
+          test_pid: self(),
+          transport: {:session, session, writer_fn}
+        )
+
+      GenServer.stop(pid)
+
+      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :close], _,
+                      %{mod: TestApp, transport: :session, reason: :normal}}
+
+      # A defensive Session.close/1 (mirroring what SSH and other byte-stream
+      # transports do in their own terminate/2) must not produce a second
+      # :close event — the Server is the single canonical lifecycle owner.
+      :ok = Session.close(session)
+      refute_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :close], _, _}
+    end
+
+    test "mount failure under :session transport emits a :close paired with the :open" do
+      Process.flag(:trap_exit, true)
+
+      capture([
+        [:ex_ratatui, :session, :lifecycle, :open],
+        [:ex_ratatui, :session, :lifecycle, :close]
+      ])
+
+      session = Session.new(20, 5)
+      writer_fn = fn _bytes -> :ok end
+
+      capture_log(fn ->
+        assert {:error, :mount_failed} =
+                 ExRatatui.Server.start_link(
+                   mod: FailingMount,
+                   name: nil,
+                   transport: {:session, session, writer_fn}
+                 )
+      end)
+
+      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :open], _,
+                      %{mod: FailingMount, transport: :session, width: 20, height: 5}}
+
+      assert_receive {:telemetry, [:ex_ratatui, :session, :lifecycle, :close], _,
+                      %{mod: FailingMount, transport: :session, reason: :mount_failed}}
     end
   end
 
