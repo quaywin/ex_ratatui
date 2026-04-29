@@ -305,7 +305,16 @@ defmodule ExRatatui.Server do
 
   def handle_info({:ex_ratatui_resize, w, h}, %__MODULE__{transport: transport} = state)
       when transport in [:session, :distributed_server] do
-    {:noreply, do_render(%{state | width: w, height: h})}
+    # Update the cached size *before* dispatching so the render that
+    # follows the App's handle_event/2 callback (inside dispatch_event)
+    # uses the new dimensions. Without this, an App that adjusts state
+    # in response to Resize would see stale `frame.width` / `frame.height`
+    # on the very render where it expects the new ones.
+    state = %{state | width: w, height: h}
+
+    state
+    |> dispatch_event(%ExRatatui.Event.Resize{width: w, height: h})
+    |> process_event_result()
   end
 
   def handle_info(

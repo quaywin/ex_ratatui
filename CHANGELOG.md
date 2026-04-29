@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`%Event.Resize{}` now reaches `handle_event/2` over byte-stream transports** — when the runtime ran over a byte-stream transport (`:session` for SSH / Kino / custom TCP, `:distributed_server` for distribution), the `{:ex_ratatui_resize, w, h}` message synthesized by `ExRatatui.Transport.ByteStream` was intercepted by the Server's own `handle_info/2` clause: it updated the cached `width` / `height` and re-rendered, but never dispatched a `%Event.Resize{}` to the App. The local-tty path delivered Resize through the polling event loop, so an App that worked when run over the real terminal would silently miss resize events the moment it was supervised over SSH, distribution, or a Livebook notebook. The Server now updates its cached size first (so the follow-up render sees the new dims) and then routes the resize through `dispatch_event/2`, giving the App's `handle_event/2` exactly the same `%Event.Resize{width: w, height: h}` it would see on local tty. Apps that only had a fall-through `handle_event(_, state)` clause are unaffected; apps that explicitly track terminal size in their own state can now do so over every transport. The two transport tests (`session_transport_test.exs`, `distributed_transport_test.exs`) were updated to assert App delivery in addition to the re-render
+
 ## [0.8.1] - 2026-04-27
 
 ### Added

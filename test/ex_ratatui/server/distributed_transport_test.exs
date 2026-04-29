@@ -225,7 +225,7 @@ defmodule ExRatatui.Server.DistributedTransportTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
     end
 
-    test "{:ex_ratatui_resize, w, h} updates size and re-renders" do
+    test "{:ex_ratatui_resize, w, h} delivers Resize event to App and re-renders with new size" do
       {:ok, pid} =
         ExRatatui.Server.start_link(
           mod: Echo,
@@ -239,7 +239,11 @@ defmodule ExRatatui.Server.DistributedTransportTest do
       assert_receive {:ex_ratatui_draw, _}, 1000
 
       send(pid, {:ex_ratatui_resize, 120, 40})
-      assert_receive {:rendered, 0, %Frame{width: 120, height: 40}}, 1000
+
+      # The App sees a Resize event (Echo bumps count on every event)
+      # and the follow-up render uses the new dims.
+      assert_receive {:event, %ExRatatui.Event.Resize{width: 120, height: 40}}, 1000
+      assert_receive {:rendered, 1, %Frame{width: 120, height: 40}}, 1000
 
       GenServer.stop(pid)
     end

@@ -162,7 +162,7 @@ defmodule ExRatatui.Server.SessionTransportTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
     end
 
-    test "{:ex_ratatui_resize, w, h} updates cached size and re-renders" do
+    test "{:ex_ratatui_resize, w, h} delivers Resize event to App and re-renders with new size" do
       session = Session.new(40, 10)
 
       {:ok, pid} =
@@ -179,10 +179,13 @@ defmodule ExRatatui.Server.SessionTransportTest do
 
       send(pid, {:ex_ratatui_resize, 100, 30})
 
-      # Re-render uses the new cached dims (we don't poke the Session
-      # here — the SSH channel is responsible for calling Session.resize
-      # before forwarding the resize message).
-      assert_receive {:rendered, 0, %Frame{width: 100, height: 30}}, 1000
+      # The App sees a Resize event in handle_event/2 (Echo bumps count
+      # on every event), and the follow-up render uses the new cached
+      # dims. We don't poke the Session here — the transport channel is
+      # responsible for calling Session.resize before forwarding the
+      # resize message.
+      assert_receive {:event, %ExRatatui.Event.Resize{width: 100, height: 30}}, 1000
+      assert_receive {:rendered, 1, %Frame{width: 100, height: 30}}, 1000
 
       GenServer.stop(pid)
     end
