@@ -44,8 +44,8 @@ The full catalog (system monitor, chat interface, task manager, Ecto-backed CRUD
 - [ash_tui](https://github.com/mcass19/ash_tui) — Interactive terminal explorer for [Ash](https://ash-hq.org) domains, resources, attributes, actions, and more.
 - [bb_tui](https://github.com/mcass19/bb_tui) — **Proposal** terminal-based dashboard for [Beam Bots](https://github.com/beam-bots) robots.
 - [switchyard](https://github.com/nshkrdotcom/switchyard) — Full-featured reducer runtime workbench exercising command batching, async effects, subscription reconciliation, runtime snapshots, distributed attach, and row-scrolled WidgetList.
-- [nerves_ex_ratatui_example](https://github.com/mcass19/nerves_ex_ratatui_example) — Example [Nerves](https://nerves-project.org) project with three TUIs (system monitor, LED control, and a reducer-runtime system monitor) on embedded hardware, reachable over SSH subsystems and Erlang distribution.
-- [phoenix_ex_ratatui_example](https://github.com/mcass19/phoenix_ex_ratatui_example) — Example [Phoenix](https://www.phoenixframework.org/) project with two TUIs (callback and reducer runtime) served over SSH and Erlang distribution alongside a public LiveView chat room, sharing PubSub between the browser and the terminal.
+- [nerves_ex_ratatui_example](https://github.com/mcass19/nerves_ex_ratatui_example) — Example [Nerves](https://nerves-project.org) project with two TUIs (system monitor and LED control) on embedded hardware, reachable over SSH subsystems and Erlang distribution.
+- [phoenix_ex_ratatui_example](https://github.com/mcass19/phoenix_ex_ratatui_example) — Example [Phoenix](https://www.phoenixframework.org/) project with a TUI served over SSH and Erlang distribution alongside a public LiveView chat room, sharing PubSub between the browser and the terminal.
 - ... yours? Open a PR! Plenty of ideas to explore in [awesome-ratatui](https://github.com/ratatui/awesome-ratatui).
 
 ## Installation
