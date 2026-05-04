@@ -22,7 +22,7 @@ Every event carries `:mod` and `:transport` in its metadata, so the same handler
 
 The split between `:runtime, :event` and `:runtime, :update` isn't arbitrary. Terminal input goes through `:event`; everything else — subscriptions firing, async command results, plain `send/2` into the server — goes through `:update`. When you're asking "is my app slow because of keyboard handling or because my tick interval is doing too much?", that's the first place to look. `:render, :frame`'s `:stop` event also adds `:widget_count` to its metadata, which makes a `Telemetry.Metrics` summary like "p99 frame build by widget count" a one-liner.
 
-## Quick start: log every event
+## Log every event
 
 ExRatatui ships a default logger that attaches one handler for every event:
 
@@ -42,7 +42,7 @@ ExRatatui.Telemetry.attach_default_logger(
 
 `detach_default_logger/0` reverses it.
 
-## `Telemetry.Metrics`
+## Telemetry.Metrics
 
 [`telemetry_metrics`](https://hexdocs.pm/telemetry_metrics) converts `:telemetry` events into summaries, counters, and distributions. Wire the output into a reporter and you have dashboards in minutes.
 

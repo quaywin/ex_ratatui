@@ -2,7 +2,7 @@
 
 This guide walks you from an empty `mix new` project to a supervised terminal UI you can actually use. Read it top-to-bottom the first time; come back later for the capstone module.
 
-Every concept is introduced with runnable code. If you get stuck, compare your file against the snippets or run the matching example from `examples/`.
+Every concept is introduced with runnable code. If you get stuck, compare your file against the snippets.
 
 ## What you'll build
 
@@ -21,8 +21,6 @@ A small todo app. Type an item, press Enter to add it, move selection with `↑`
 └────────────────────────────────────────────────────────┘
   Tab switch · Enter add · d delete · Esc quit
 ```
-
-~80 lines of Elixir. No JavaScript, no web server, no Rust toolchain on your machine.
 
 ## Install and verify
 
