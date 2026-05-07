@@ -36,7 +36,7 @@ Edit `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:ex_ratatui, "~> 0.8"}
+    {:ex_ratatui, "~> 0.9"}
   ]
 end
 ```

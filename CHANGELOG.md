@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-7
+
 ### Added
 
 - **Property-based tests for the `:intents` runtime opt.** New `test/ex_ratatui/property/intents_property_test.exs` (`async: true`) with two properties under the 4-tuple `{:cell_session, cs, cell_writer_fn, intent_writer_fn}` transport tag: (1) for any mount-intent list and any sequence of `handle_info`-supplied batches, the writer receives every intent in concat order with no reordering, drops, or extras; (2) empty `intents: []` batches never fire on the writer regardless of how many sequential empty handle_info calls a TUI makes. Complements the existing scenario unit tests in `ExRatatui.Server.IntentsTest` (mount-time, handle_event, handle_info, stop-with-intent, drop-without-writer, shape validation) — together they pin the full intent contract. Reuses the existing `ExRatatui.Test.ServerApps.Intents` fixture.
@@ -342,8 +344,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...HEAD
-[0.8.1]: https://github.com/mcass19/ex_ratatui/compare/v0.8.1...v0.8.2
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...v0.9.0
+[0.8.2]: https://github.com/mcass19/ex_ratatui/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/mcass19/ex_ratatui/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/mcass19/ex_ratatui/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/mcass19/ex_ratatui/compare/v0.7.0...v0.7.1
