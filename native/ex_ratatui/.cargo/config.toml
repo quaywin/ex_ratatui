@@ -6,12 +6,14 @@ rustflags = [
 
 [target.x86_64-unknown-linux-musl]
 rustflags = [
-    "-C", "target-feature=-crt-static"
+    "-C", "target-feature=-crt-static",
+    "-C", "link-arg=-static-libgcc",
 ]
 
 [target.aarch64-unknown-linux-musl]
 rustflags = [
-    "-C", "target-feature=-crt-static"
+    "-C", "target-feature=-crt-static",
+    "-C", "link-arg=-static-libgcc",
 ]
 
 [profile.release]
