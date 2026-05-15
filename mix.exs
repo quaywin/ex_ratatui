@@ -126,6 +126,7 @@ defmodule ExRatatui.MixProject do
         "guides/custom_transports.md": [title: "Custom Transports"],
         "guides/cell_session.md": [title: "Rendering to Non-Terminal Surfaces"],
         "guides/images.md": [title: "Images"],
+        "guides/packaging_with_burrito.md": [title: "Packaging with Burrito"],
         "guides/cheatsheets/widgets.cheatmd": [title: "Widgets Cheatsheet"],
         "CONTRIBUTING.md": [title: "Contributing"],
         "CHANGELOG.md": [title: "Changelog"]

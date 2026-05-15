@@ -163,6 +163,7 @@ All transports serve the same `ExRatatui.App` module — switch by changing a si
 | [Running TUIs over Erlang Distribution](guides/distributed_transport.md) | Drive a TUI from a remote BEAM node with zero NIF on the app side |
 | [Custom Transports](guides/custom_transports.md) | Plug in your own transport (TCP, Livebook, WebSocket) via the `ExRatatui.Transport` behaviour |
 | [Rendering to Non-Terminal Surfaces](guides/cell_session.md) | Use `ExRatatui.CellSession` to expose the rendered cell buffer to LiveView, framebuffers, screenshot tools, and other non-ANSI consumers |
+| [Packaging with Burrito](guides/packaging_with_burrito.md) | Ship a TUI as a single-file native binary per OS/arch via [Burrito](https://github.com/burrito-elixir/burrito) — no Erlang or Rust install required for end users |
 | [Widgets Cheatsheet](guides/cheatsheets/widgets.cheatmd) | One-page reference with every struct and its key fields |
 
 ## How It Works
