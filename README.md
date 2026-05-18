@@ -31,6 +31,7 @@ Build rich terminal UIs in Elixir with ratatui's layout engine, widget library, 
 - Focus management for multi-panel apps via `ExRatatui.Focus`: declare a ring of focusable IDs, cycle with Tab/Shift+Tab, dispatch keystrokes to the active widget
 - Headless test backend for CI-friendly rendering verification
 - Precompiled NIF binaries: no Rust toolchain needed
+- **Single-binary distribution** via [Burrito](https://github.com/burrito-elixir/burrito): ship a TUI as one statically-linked native file per OS/arch — no Erlang or Rust install required for end users. `mix ex_ratatui.gen.burrito` scaffolds the wiring; see the [Packaging with Burrito guide](guides/packaging_with_burrito.md).
 - Runs on BEAM's DirtyIo scheduler: never blocks your processes
 
 ## Examples
