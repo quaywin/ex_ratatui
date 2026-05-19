@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-19
+
 ### Added
 
 - **`ExRatatui.Widgets.CodeBlock` — syntax-highlighted source code.** Display-only widget powered by [syntect](https://github.com/trishume/syntect)'s bundled `SyntaxSet` and `ThemeSet`. Fields: `:content`, `:language` (any syntect token name; `nil` for plain text fallback), `:theme` (seven curated atoms — `:base16_ocean_dark`, `:base16_ocean_light`, `:base16_eighties_dark`, `:base16_mocha_dark`, `:inspired_github`, `:solarized_dark`, `:solarized_light` — or any raw string for custom theme sets), `:line_numbers` + `:starting_line` (right-aligned dim gutter with `│` separator, width grows with the last visible line), `:highlight_lines` (list of ints + ranges like `[3, 7..9]`, normalised to a sorted unique list, rendered with a theme-derived background that brightens dark themes and dims light themes by 20/256 per channel). Composes with `Block`, `Popup`, and `WidgetList` like every other widget. One new widget type (`"code_block"`) on the render decoder.
@@ -396,7 +398,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...v0.10.0
 [0.9.0]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/mcass19/ex_ratatui/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/mcass19/ex_ratatui/compare/v0.8.0...v0.8.1
