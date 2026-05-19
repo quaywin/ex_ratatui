@@ -524,6 +524,41 @@ Renders markdown text with syntax-highlighted code blocks, powered by `tui-markd
 }
 ```
 
+### CodeBlock
+
+Renders syntax-highlighted source code as a display-only widget, powered by [syntect](https://github.com/trishume/syntect)'s bundled `SyntaxSet` and `ThemeSet`. Unlike `Markdown` — which wraps code inside a larger document — `CodeBlock` is the right pick when the whole widget is the snippet: a `:q`-style help popup, a diff viewer, a REPL transcript pane.
+
+```elixir
+%ExRatatui.Widgets.CodeBlock{
+  content: """
+  defmodule Counter do
+    def inc(n), do: n + 1
+  end
+  """,
+  language: "elixir",                          # nil = plain text fallback
+  theme: :base16_ocean_dark,
+  line_numbers: true,
+  starting_line: 1,
+  highlight_lines: [2, 5..7],                  # ints + ranges, normalised
+  block: %Block{title: " counter.ex ", borders: [:all]}
+}
+```
+
+Themes accept seven curated atoms — `:base16_ocean_dark`, `:base16_ocean_light`, `:base16_eighties_dark`, `:base16_mocha_dark`, `:inspired_github`, `:solarized_dark`, `:solarized_light` — or any raw string for custom theme sets loaded into syntect. Languages accept any syntect token name; we ship Elixir as an additional bundled syntax on top of syntect's defaults (Rust, Python, JS, Ruby, Go, Java, JSON, YAML, Erlang, …). `nil` is a plain-text fallback that skips tokenisation.
+
+`:line_numbers` turns on a right-aligned dim gutter with a `│` separator; the gutter width grows with the last visible line. `:highlight_lines` accepts a mixed list of ints and ranges (`[3, 7..9]`); the widget normalises that to a sorted unique line set and renders each emphasised line with a theme-derived background (lightened for dark themes, darkened for light themes).
+
+For composite widgets — a diff viewer that paints `+`/`-` gutters, an inspector that interleaves source and AST — reach for the raw helper instead:
+
+```elixir
+ExRatatui.CodeBlock.highlight("fn main() {}", "rust", :solarized_dark)
+# => [%ExRatatui.Text.Line{spans: [%Span{}, ...]}, ...]
+```
+
+`highlight/3` returns the same `[%Line{}]` shape the widget uses internally, so you can drop it into a `Paragraph` or compose it with your own gutter / annotations without re-implementing syntect translation. The call is NIF-backed, runs on a `DirtyCpu` scheduler, and emits a `[:ex_ratatui, :code_block, :highlight]` telemetry span — see the [Telemetry guide](telemetry.md) for the metadata shape.
+
+See `examples/code_block_demo.exs` to cycle through every theme / language / gutter combination interactively.
+
 ### Textarea
 
 A multiline text editor with undo/redo, cursor movement, and Emacs-style shortcuts. This is a **stateful** widget — its state lives in Rust via ResourceArc.

@@ -12,13 +12,15 @@ Two categories, all prefixed with `:ex_ratatui`. **Span events** wrap something 
 | `[:ex_ratatui, :runtime, :event]` | span | Terminal event → `handle_event/2` | `:mod`, `:transport`, `:event` |
 | `[:ex_ratatui, :runtime, :update]` | span | Info message → `handle_info/2` (subscriptions, async results, user sends) | `:mod`, `:transport`, `:msg` |
 | `[:ex_ratatui, :render, :frame]` | span | Frame build + draw | `:mod`, `:transport`, `:widget_count` (on `:stop`) |
+| `[:ex_ratatui, :image, :decode]` | span | `ExRatatui.Image.new/2` (PNG / JPEG / GIF / WebP / BMP byte decode) | `:format` (`:png` / `:jpeg` / `:gif` / `:webp` / `:bmp` / `:unknown`), `:bytes`; on `:stop` adds `:width` and `:height` on success, or `:error` on `{:error, {:decode_failed, _}}` |
+| `[:ex_ratatui, :code_block, :highlight]` | span | `ExRatatui.CodeBlock.highlight/3` (syntect tokenisation) | `:language` (string or `nil`), `:theme` (resolved syntect name), `:bytes`; on `:stop` adds `:line_count` |
 | `[:ex_ratatui, :transport, :connect]` | span | Transport handshake at server start | `:mod`, `:transport` |
 | `[:ex_ratatui, :session, :lifecycle, :open]` | single | Session-backed runtime adopts a session | `:mod`, `:transport`, `:width`, `:height` |
 | `[:ex_ratatui, :session, :lifecycle, :close]` | single | Session-backed runtime releases its session (fires once per session even when the transport's own teardown closes the ref defensively) | `:mod`, `:transport`, `:reason` |
 | `[:ex_ratatui, :render, :dropped]` | single | Frame skipped (draw error, future backpressure) | `:mod`, `:transport`, `:reason` |
 | `[:ex_ratatui, :transport, :disconnect]` | single | Server `terminate/2` | `:mod`, `:transport`, `:reason` |
 
-Every event carries `:mod` and `:transport` in its metadata, so the same handler can tag frames by app module or filter by transport without fishing for the data elsewhere.
+Every runtime / render / transport / session event carries `:mod` and `:transport` in its metadata, so the same handler can tag frames by app module or filter by transport without fishing for the data elsewhere. The two library-level spans — `[:ex_ratatui, :image, :decode]` and `[:ex_ratatui, :code_block, :highlight]` — fire from pure functions outside the server, so they carry only their own decode / highlight metadata; correlate them with a render frame via the `telemetry_span_context` reference if you need that join.
 
 The split between `:runtime, :event` and `:runtime, :update` isn't arbitrary. Terminal input goes through `:event`; everything else — subscriptions firing, async command results, plain `send/2` into the server — goes through `:update`. When you're asking "is my app slow because of keyboard handling or because my tick interval is doing too much?", that's the first place to look. `:render, :frame`'s `:stop` event also adds `:widget_count` to its metadata, which makes a `Telemetry.Metrics` summary like "p99 frame build by widget count" a one-liner.
 

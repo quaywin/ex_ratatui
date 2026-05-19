@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Binary size grows by ~1.6 MB.** ratatui-image pulls in `image` (with PNG / JPEG / GIF / WebP / BMP decoders) and bundled Kitty / Sixel / iTerm2 encoders. No new system dependencies — chafa is feature-gated off, sixel uses pure-Rust `icy_sixel`.
 
+### Fixed
+
+- **Precompiled musl NIFs now load under musl runtimes.** `native/ex_ratatui/.cargo/config.toml`'s `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` targets now pass `-C link-arg=-static-libgcc` alongside the existing `target-feature=-crt-static`. Without it the NIF `.so` linked against the build host's glibc `libgcc_s.so.1` and the musl loader on the consumer side refused it. Alpine and other musl-libc deploys can now consume the precompiled artifact directly — no source rebuild required.
+
 ## [0.9.0] - 2026-05-7
 
 ### Added
