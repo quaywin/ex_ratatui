@@ -167,8 +167,16 @@ target by default, which fails on the first host that's missing a tool
 needed for *some other* target:
 
 ```sh
-BURRITO_TARGET=linux MIX_ENV=prod mix release --overwrite
+TARGET_ABI=musl BURRITO_TARGET=linux MIX_ENV=prod mix release --overwrite
 ```
+
+`TARGET_ABI=musl` is required for the `linux` target. Burrito's linux
+wrapper uses a musl runtime, so the bundled NIF must be the musl
+variant — without the override, `rustler_precompiled` resolves the
+glibc NIF based on the build host and the wrapped binary crashes at
+NIF load with "Error loading shared library libgcc_s.so.1". The other
+targets do not need this override; pass `TARGET_ABI=musl` only when
+`BURRITO_TARGET=linux`.
 
 Output lands in `burrito_out/`:
 
