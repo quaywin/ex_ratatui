@@ -26,3 +26,11 @@ syntect = "5"
 default = ["nif_version_2_16"]
 nif_version_2_16 = ["rustler/nif_version_2_16"]
 nif_version_2_17 = ["rustler/nif_version_2_17"]
+
+# Strip Rust's panic-unwinding machinery so the NIF has no runtime
+# dependency on libgcc_s.so.1. `-static-libgcc` alone leaves the
+# unwinder linking dynamically, which breaks the load under burrito's
+# musl wrapper. Trade-off: a panic inside the NIF aborts the BEAM
+# instead of being caught and reported via rustler.
+[profile.release]
+panic = "abort"
