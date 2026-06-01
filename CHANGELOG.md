@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-06-01
+
 ### Added
 
 - **`ExRatatui.Theme` — pure-data palette struct (Layer A theming).** Eleven semantic slots (`:primary`, `:accent`, `:border`, `:border_focused`, `:surface`, `:surface_alt`, `:text`, `:text_dim`, `:success`, `:warning`, `:danger`) each accepting the full `t:ExRatatui.Style.color/0` shape (named atoms, `{:rgb, r, g, b}`, `{:indexed, n}`, or `nil`). Two starter constructors ship: `default/0` (terminal-respecting; `surface: nil` so the same theme works on light and dark terminals) and `light/0` (dark text on white surface). Three composition helpers cover the common patterns: `border_style(theme, focused: true|false)`, `text_style(theme, dim: true|false)`, `selection_style(theme)`. Apps thread the theme through render code by hand — no `Application.get_env` magic, no automatic widget injection. Layer B (opt-in per-widget defaults at render time) is intentionally deferred.
@@ -63,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ExRatatui.Widgets.Table` defaults.** `defstruct` adds `:footer` (`nil`), `:column_highlight_style` (`nil`), `:cell_highlight_style` (`nil`), `:header_style` (`nil`), `:footer_style` (`nil`), `:highlight_spacing` (`:when_selected` — matches ratatui).
 
 - **Rust-side `BlockData`, `ListData`, `TableData` gain `Default` impls.** Test fixtures and Rust callers (one per widget that composes a Block) shrink to `..Default::default()` — same backward-compat guarantee inside the native code as on the Elixir side.
+
+## [0.10.0] - 2026-05-19
 
 ### Added
 
@@ -453,8 +457,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.10.0...HEAD
-[0.10.0]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...v0.10.0
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/mcass19/ex_ratatui/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/mcass19/ex_ratatui/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/mcass19/ex_ratatui/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/mcass19/ex_ratatui/compare/v0.8.0...v0.8.1
