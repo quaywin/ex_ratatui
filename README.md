@@ -44,9 +44,13 @@ Build rich terminal UIs in Elixir with ratatui's layout engine, widget library, 
 
 The full catalog (system monitor, chat interface, task manager, Ecto-backed CRUD, and more — plus SSH and Erlang-distribution one-liners) lives in [`examples/README.md`](examples/README.md).
 
-## Built with ExRatatui
+## Ecosystem
 
 - [kino_ex_ratatui](https://github.com/mcass19/kino_ex_ratatui) — Run TUIs inside [Livebook](https://livebook.dev) notebooks.
+- [phoenix_ex_ratatui](https://github.com/mcass19/phoenix_ex_ratatui) — Run TUIs in the browser within [Phoenix LiveView](https://phoenix-live-view.hexdocs.pm/Phoenix.LiveView.html).
+
+## Built with ExRatatui
+
 - [ash_tui](https://github.com/mcass19/ash_tui) — Interactive terminal explorer for [Ash](https://ash-hq.org) domains, resources, attributes, actions, and more.
 - [bb_tui](https://github.com/mcass19/bb_tui) — **Proposal** terminal-based dashboard for [Beam Bots](https://github.com/beam-bots) robots.
 - [switchyard](https://github.com/nshkrdotcom/switchyard) — Full-featured reducer runtime workbench exercising command batching, async effects, subscription reconciliation, runtime snapshots, distributed attach, and row-scrolled WidgetList.
