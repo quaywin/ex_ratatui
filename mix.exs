@@ -99,7 +99,7 @@ defmodule ExRatatui.MixProject do
       keywords: ~w(tui terminal ratatui cli ssh nerves distributed otp),
       files: ~w(
         lib native .formatter.exs mix.exs README.md LICENSE CHANGELOG.md
-        checksum-Elixir.ExRatatui.Native.exs
+        usage-rules.md checksum-Elixir.ExRatatui.Native.exs
       ),
       exclude_patterns: ~w(native/ex_ratatui/target)
     ]
@@ -111,6 +111,7 @@ defmodule ExRatatui.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md": [title: "Overview"],
+        "usage-rules.md": [title: "Usage Rules (for AI agents)"],
         "guides/getting_started.md": [title: "Getting Started"],
         "guides/building_uis.md": [title: "Building UIs"],
         "guides/callback_runtime.md": [title: "Callback Runtime"],
