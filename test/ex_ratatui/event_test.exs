@@ -1,6 +1,8 @@
 defmodule ExRatatui.EventTest do
   use ExUnit.Case, async: true
 
+  import ExRatatui.Test.Untyped
+
   doctest ExRatatui.Event.Key
   doctest ExRatatui.Event.Mouse
   doctest ExRatatui.Event.Resize
@@ -8,12 +10,12 @@ defmodule ExRatatui.EventTest do
   describe "poll_event/1" do
     test "returns nil (timeout), an event, or {:error, _} (no TTY)" do
       result = ExRatatui.poll_event(10)
-      assert valid_poll_result?(result)
+      assert valid_poll_result?(untyped(result))
     end
 
     test "accepts default timeout (no argument)" do
       result = ExRatatui.poll_event()
-      assert valid_poll_result?(result)
+      assert valid_poll_result?(untyped(result))
     end
 
     test "does not block the BEAM (runs on dirty scheduler)" do
@@ -36,7 +38,7 @@ defmodule ExRatatui.EventTest do
         for _ <- 1..4 do
           Task.async(fn ->
             result = ExRatatui.poll_event(10)
-            assert valid_poll_result?(result)
+            assert valid_poll_result?(untyped(result))
             :ok
           end)
         end

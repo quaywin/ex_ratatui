@@ -2,6 +2,7 @@ defmodule ExRatatui.ServerTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
+  import ExRatatui.Test.Untyped
 
   alias ExRatatui.Frame
   alias ExRatatui.Runtime
@@ -481,7 +482,7 @@ defmodule ExRatatui.ServerTest do
     end
 
     test "uses the default resolver when dimensions are not explicit" do
-      {w, h} = ExRatatui.Server.resolve_terminal_size(nil)
+      {w, h} = untyped(ExRatatui.Server.resolve_terminal_size(nil))
       assert is_integer(w) and is_integer(h)
     end
 

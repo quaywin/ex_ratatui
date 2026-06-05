@@ -7,6 +7,8 @@ defmodule ExRatatui.TransportTest do
 
   use ExUnit.Case, async: true
 
+  import ExRatatui.Test.Untyped
+
   alias ExRatatui.Frame
   alias ExRatatui.Session
   alias ExRatatui.Test.ServerApps.Echo
@@ -40,7 +42,7 @@ defmodule ExRatatui.TransportTest do
 
     test "raises on non-list opts" do
       assert_raise FunctionClauseError, fn ->
-        ExRatatui.Transport.start_server(%{mod: Echo})
+        ExRatatui.Transport.start_server(untyped(%{mod: Echo}))
       end
     end
   end

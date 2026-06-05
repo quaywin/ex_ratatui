@@ -1,6 +1,8 @@
 defmodule ExRatatui.FocusTest do
   use ExUnit.Case, async: true
 
+  import ExRatatui.Test.Untyped
+
   doctest ExRatatui.Focus
 
   alias ExRatatui.Event
@@ -39,7 +41,7 @@ defmodule ExRatatui.FocusTest do
     end
 
     test "raises on an empty ID list" do
-      assert_raise ArgumentError, ~r/non-empty/, fn -> Focus.new([]) end
+      assert_raise ArgumentError, ~r/non-empty/, fn -> Focus.new(untyped([])) end
     end
 
     test "raises on duplicate IDs" do

@@ -5,6 +5,8 @@ defmodule ExRatatui.ImageProtocolTest do
   # and the Distributed client opt forwarding.
   use ExUnit.Case, async: true
 
+  import ExRatatui.Test.Untyped
+
   alias ExRatatui.Bridge
   alias ExRatatui.Image
   alias ExRatatui.Layout.Rect
@@ -83,7 +85,7 @@ defmodule ExRatatui.ImageProtocolTest do
       on_exit(fn -> Session.close(session) end)
 
       assert_raise FunctionClauseError, fn ->
-        Session.set_image_protocol(session, :gibberish)
+        Session.set_image_protocol(session, untyped(:gibberish))
       end
     end
 
@@ -133,7 +135,7 @@ defmodule ExRatatui.ImageProtocolTest do
       on_exit(fn -> ExRatatui.Native.restore_terminal(terminal) end)
 
       assert_raise FunctionClauseError, fn ->
-        ExRatatui.set_image_protocol(terminal, :gibberish)
+        ExRatatui.set_image_protocol(terminal, untyped(:gibberish))
       end
     end
   end

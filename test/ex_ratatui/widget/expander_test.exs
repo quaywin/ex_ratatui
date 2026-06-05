@@ -1,6 +1,8 @@
 defmodule ExRatatui.Widget.ExpanderTest do
   use ExUnit.Case, async: true
 
+  import ExRatatui.Test.Untyped
+
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Widget.Expander
   alias ExRatatui.Widgets.{Block, Paragraph}
@@ -129,7 +131,7 @@ defmodule ExRatatui.Widget.ExpanderTest do
     end
 
     test "raises on non-list input" do
-      assert_raise FunctionClauseError, fn -> Expander.expand!(:not_a_list) end
+      assert_raise FunctionClauseError, fn -> Expander.expand!(untyped(:not_a_list)) end
     end
 
     test "raises on entry that is not a {widget, rect} tuple" do

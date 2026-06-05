@@ -691,7 +691,7 @@ defmodule WidgetShowcase do
     [{chart, area}]
   end
 
-  defp render_tab(%{tab: 7} = state, area) do
+  defp render_tab(%{tab: 7} = state, %Rect{} = area) do
     content_width = area.width - 1
     content_area = %Rect{area | width: content_width}
     scrollbar_area = %Rect{area | x: area.x + content_width, width: 1}
