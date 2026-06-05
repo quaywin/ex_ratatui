@@ -15,9 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - elixir: "1.20"
+            erlang: "28.5"
+            lint: true
           - elixir: "1.19"
             erlang: "28.2"
-            lint: true
           - elixir: "1.18"
             erlang: "27.3.4.6"
           - elixir: "1.17"
@@ -102,7 +104,7 @@ jobs:
           path: |
             _build
             deps
-          key: ${{ runner.os }}-extras-1.19-28.2-${{ hashFiles('mix.lock') }}
+          key: ${{ runner.os }}-extras-1.20-28.5-${{ hashFiles('mix.lock') }}
 
       - uses: actions/cache@v5
         with:
@@ -115,8 +117,8 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "28.2"
-          elixir-version: "1.19"
+          otp-version: "28.5"
+          elixir-version: "1.20"
 
       - uses: dtolnay/rust-toolchain@stable
 
