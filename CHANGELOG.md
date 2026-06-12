@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-06-12
+
 ### Added
 
 - **Per-widget example isolates — every built-in widget now has a focused, copyable demo.** New standalone examples under `examples/widgets/` cover the widgets that previously only appeared inside large multi-tab or app examples: `barchart`, `sparkline`, `chart`, `calendar`, `canvas`, `checkbox`, `gauge`, `line_gauge`, `scrollbar`, `tabs`, `list`, `markdown`, `popup`, `widget_list`, `slash_commands`, `textarea`, and `clear`. Each is a short, single-purpose script so a widget can be lifted out without untangling it from a larger app.
@@ -497,7 +499,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/mcass19/ex_ratatui/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/mcass19/ex_ratatui/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/mcass19/ex_ratatui/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/mcass19/ex_ratatui/compare/v0.8.2...v0.9.0
