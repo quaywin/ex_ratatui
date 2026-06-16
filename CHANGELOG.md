@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-16
+
 ### Added
 
 - **Project logo.** New logo assets under `assets/` (`logo` mark and `logo_letters` wordmark, each as SVG/PNG/JPG). The README header is now centered — logotype, then description, then badges — and the logo mark appears next to the project name in the hexdocs sidebar (via the ex_doc `:logo` option, which ships `assets/logo.png` in the Hex package).
@@ -508,7 +510,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/mcass19/ex_ratatui/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/mcass19/ex_ratatui/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/mcass19/ex_ratatui/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/mcass19/ex_ratatui/compare/v0.9.0...v0.10.0
