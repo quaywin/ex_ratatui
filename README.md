@@ -157,6 +157,12 @@ The [Architecture guide](guides/internals/architecture.md) has the full picture 
 
 Contributions are welcome! See [CONTRIBUTING.md](https://github.com/mcass19/ex_ratatui/blob/main/CONTRIBUTING.md) for development setup and PR guidelines.
 
+## Acknowledgements
+
+ExRatatui is undeniably inspired by [ratatui](https://github.com/ratatui/ratatui). Having such a great terminal UI library in Rust was the motivation to bring the same experience to the Elixir world and combine the best of both worlds. Special thanks to the great community behind ratatui.
+
+The ExRatatui logo adapts the ratatui logo designed by [Pavel Fomchenkov](https://github.com/nawok), with the Elixir drop and ex_ratatui wordmark added by [Malena Merlina](https://www.linkedin.com/in/malenamerlinadiez).
+
 ## License
 
 MIT — see [LICENSE](https://github.com/mcass19/ex_ratatui/blob/main/LICENSE) for details.
