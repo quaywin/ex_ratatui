@@ -142,6 +142,14 @@ The server tried to initialize a real terminal but the process has no TTY. Happe
 
 **Fix:** For tests, pass `test_mode: {width, height}`. For dev, run from a real terminal emulator (Ghostty, iTerm2, Alacritty, Windows Terminal). For production use over SSH, don't use `:local` — use `transport: :ssh` so the daemon handles PTY allocation per client.
 
+### Dropped keystrokes or missing characters
+
+Characters vanish under fast or sustained typing — `hello world` echoes as `helo wld`, or 30 key presses register as 25. The cause is two readers competing for the same stdin: the app is running under `iex`, and the IEx shell's line reader consumes the terminal's stdin continuously while the TUI's poll path (crossterm) reads the same file descriptor. In raw mode each keystroke byte goes to whichever read wins, so under load some bytes are swallowed by the shell and never reach the app. The swallowed keys often surface at the IEx prompt once the TUI exits. It barely shows at one-key-at-a-time speed, which is why simpler demos feel fine.
+
+This is structural to running a terminal app inside an interactive shell, not a bug in `poll_event/1` — only the *interactive* shell competes. A plain `elixir script.exs`, `mix run`, a release, an escript, and the SSH / distributed transports all leave stdin to the TUI alone.
+
+**Fix:** Run input-heavy apps outside `iex`. `elixir my_app.exs` for a standalone script, `mix run -e "MyApp.run()"` inside a project, or a release / transport for anything beyond a quick local run. If a live shell on the same node is needed, start the app with the BEAM off stdin (`elixir --erl "-noinput" ...` or a release) and attach a remote shell from another terminal with `iex --remsh`.
+
 ### Terminal looks garbled, colors wrong
 
 The terminal emulator isn't reporting 256-color or true-color support. Most modern emulators are fine. Under `tmux` or `screen`, set `TERM=xterm-256color`. Some SSH clients strip the outer `TERM` — if colors are right locally but wrong over SSH, check the remote `echo $TERM`.
