@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-06-24
+
 ### Fixed
 
 - **Dropped keystrokes under fast typing on the `:local` transport.** crossterm (in the NIF) reads the controlling terminal directly, but the BEAM keeps its own reader on the same device — the OTP 26+ `prim_tty` reader process (`:user_drv_reader`) that backs `iex`, `elixir script.exs`, `mix run`, and shell-attached releases. Two readers on one terminal means the kernel splits keystroke bytes between them, so under sustained input some bytes were swallowed before reaching the app (more readily on macOS). `ExRatatui.run/2` and the local `ExRatatui.App` server now park that reader for the duration of a session — using `prim_tty`'s own SIGTSTP `disable`/`enable` handoff, the same mechanism the shell uses on Ctrl-Z — so crossterm owns input exclusively, then resume it on teardown so the shell returns intact (termios stays raw throughout; nothing is left in cooked mode). The handoff is a no-op when there is no such reader (older OTP, a release booted with `-noinput`, or piped stdin) and on the session/SSH/distributed transports, which never share a local terminal. Opt out with `config :ex_ratatui, detach_local_input: false`.
@@ -514,7 +516,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Precompiled NIFs:** Via `rustler_precompiled` for Linux, macOS, and Windows (x86_64 and aarch64) — no Rust toolchain required
 - **Examples:** `hello_world.exs` (minimal display), `counter.exs` (interactive key events), `counter_app.exs` (App-based counter), `task_manager.exs` (full app with all widgets), and `examples/task_manager/` (supervised Ecto + SQLite CRUD app)
 
-[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/mcass19/ex_ratatui/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/mcass19/ex_ratatui/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/mcass19/ex_ratatui/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/mcass19/ex_ratatui/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/mcass19/ex_ratatui/compare/v0.10.0...v0.10.1
