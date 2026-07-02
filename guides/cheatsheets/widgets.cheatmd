@@ -272,7 +272,7 @@ ExRatatui.CodeBlock.highlight("fn main() {}", "rust", :solarized_dark)
   header: ["Name", "Score"],
   footer: ["Total", "182"],              # optional, renders at bottom
   rows: [["Alice", "95"], ["Bob", "87"]],
-  widths: [{:percentage, 70}, {:percentage, 30}],
+  widths: [{:percentage, 70}, {:percentage, 30}],  # any Layout constraint, incl. {:fill, weight}
   selected: 0,                           # row index
   selected_column: 1,                    # required to fire column/cell styles below
   highlight_style: %Style{fg: :yellow},          # row highlight

@@ -6,6 +6,7 @@ defmodule ExRatatui.Bridge do
   # both ExRatatui.draw/2 and ExRatatui.Session.draw/2 cross the NIF
   # boundary through the same path.
 
+  alias ExRatatui.Layout
   alias ExRatatui.Layout.Rect
   alias ExRatatui.Style
   alias ExRatatui.Text.{Coerce, Encode}
@@ -126,7 +127,7 @@ defmodule ExRatatui.Bridge do
         Enum.map(table.rows, fn row ->
           Enum.map(row, &encode_line_like/1)
         end),
-      "widths" => Enum.map(table.widths, &encode_constraint(&1, "table.widths")),
+      "widths" => Enum.map(table.widths, &Layout.encode_constraint/1),
       "style" => encode_style(table.style, "table.style"),
       "highlight_style" => encode_style(table.highlight_style, "table.highlight_style"),
       "highlight_spacing" => Atom.to_string(table.highlight_spacing),
@@ -1081,10 +1082,7 @@ defmodule ExRatatui.Bridge do
   defp encode_chart_hidden_legend_constraints(nil), do: nil
 
   defp encode_chart_hidden_legend_constraints({h, v}) do
-    [
-      encode_constraint(h, "chart.hidden_legend_constraints"),
-      encode_constraint(v, "chart.hidden_legend_constraints")
-    ]
+    [Layout.encode_constraint(h), Layout.encode_constraint(v)]
   end
 
   defp encode_chart_hidden_legend_constraints(other) do
@@ -1185,21 +1183,6 @@ defmodule ExRatatui.Bridge do
   defp raise_title_alignment_error!(value, context) do
     raise ArgumentError,
           "#{context} expected :left, :center, or :right, got: #{inspect(value)}"
-  end
-
-  defp encode_constraint({:percentage, value}, _context),
-    do: %{"type" => "percentage", "value" => value}
-
-  defp encode_constraint({:length, value}, _context), do: %{"type" => "length", "value" => value}
-  defp encode_constraint({:min, value}, _context), do: %{"type" => "min", "value" => value}
-  defp encode_constraint({:max, value}, _context), do: %{"type" => "max", "value" => value}
-
-  defp encode_constraint({:ratio, numerator, denominator}, _context) do
-    %{"type" => "ratio", "num" => numerator, "den" => denominator}
-  end
-
-  defp encode_constraint(other, _context) do
-    raise ArgumentError, "invalid layout constraint: #{inspect(other)}"
   end
 
   defp encode_style(%Style{} = style, _context) do

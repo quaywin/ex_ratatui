@@ -152,13 +152,25 @@ defmodule ExRatatui.Layout do
     end
   end
 
-  @doc false
+  @doc """
+  Encodes a `t:constraint/0` tuple into the wire map the NIF decodes.
+
+  The single source of truth for constraints across the library — `split/4`,
+  `Table` column widths, and `Chart` legend constraints all route through here,
+  so every path accepts the same shapes (including `{:fill, weight}`). Raises
+  `ArgumentError` on an unrecognized shape.
+  """
+  @spec encode_constraint(constraint()) :: map()
   def encode_constraint({:percentage, n}), do: %{"type" => "percentage", "value" => n}
   def encode_constraint({:length, n}), do: %{"type" => "length", "value" => n}
   def encode_constraint({:min, n}), do: %{"type" => "min", "value" => n}
   def encode_constraint({:max, n}), do: %{"type" => "max", "value" => n}
   def encode_constraint({:ratio, num, den}), do: %{"type" => "ratio", "num" => num, "den" => den}
   def encode_constraint({:fill, n}), do: %{"type" => "fill", "value" => n}
+
+  def encode_constraint(other) do
+    raise ArgumentError, "invalid layout constraint: #{inspect(other)}"
+  end
 
   defp encode_opts(opts) do
     %{}

@@ -330,17 +330,35 @@ defmodule ExRatatui.BridgeTest do
     Session.close(session)
   end
 
-  test "encode_command supports min, max, and ratio constraints" do
+  test "encode_command supports min, max, ratio, and fill column widths" do
     {widget, _rect} =
       Bridge.encode_command(
-        {%Table{rows: [["x"]], widths: [{:min, 1}, {:max, 2}, {:ratio, 1, 3}]},
+        {%Table{rows: [["x"]], widths: [{:min, 1}, {:max, 2}, {:ratio, 1, 3}, {:fill, 1}]},
          %Rect{x: 0, y: 0, width: 10, height: 2}}
       )
 
     assert widget["widths"] == [
              %{"type" => "min", "value" => 1},
              %{"type" => "max", "value" => 2},
-             %{"type" => "ratio", "num" => 1, "den" => 3}
+             %{"type" => "ratio", "num" => 1, "den" => 3},
+             %{"type" => "fill", "value" => 1}
            ]
+  end
+
+  # Column widths route through the shared Layout.encode_constraint/1, so a
+  # {:fill, _} width must draw end-to-end. Regression for the crash where the
+  # bridge's own encoder lacked :fill and blew up inside draw/2 (not render).
+  test "a Table with {:fill, weight} column widths draws without crashing" do
+    terminal = ExRatatui.init_test_terminal(30, 3)
+    on_exit(fn -> ExRatatui.Native.restore_terminal(terminal) end)
+
+    table = %Table{
+      header: ["name", "value"],
+      rows: [["alpha", "1"], ["beta", "2"]],
+      widths: [{:length, 8}, {:fill, 1}]
+    }
+
+    assert :ok = ExRatatui.draw(terminal, [{table, %Rect{x: 0, y: 0, width: 30, height: 3}}])
+    assert ExRatatui.get_buffer_content(terminal) =~ "alpha"
   end
 end

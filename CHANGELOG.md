@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **`{:fill, weight}` column widths now work on `Table` and `Chart`.** `Constraint::Fill` shipped for `ExRatatui.Layout.split/4`, but `Table` `:widths` and `Chart` `:hidden_legend_constraints` ran through a second, private constraint encoder in the internal bridge layer that never learned the `:fill` shape — so `[{:length, 8}, {:fill, 1}]` widths raised `ArgumentError: invalid layout constraint` deep inside `draw/2` (after `render/2` had already returned), which can freeze an app whose render loop does not expect that path to throw. Both call sites now route through `ExRatatui.Layout.encode_constraint/1`, making it the genuine single source of truth for every constraint shape (it gained a friendly `ArgumentError` for unknown shapes, matching the previous message). `Table` column widths and `Chart` legend constraints accept the full set — `:length`, `:percentage`, `:min`, `:max`, `:ratio`, and `{:fill, weight}`.
+
 ## [0.11.1] - 2026-06-24
 
 ### Fixed

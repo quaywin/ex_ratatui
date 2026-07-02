@@ -107,6 +107,33 @@ defmodule ExRatatui.LayoutTest do
     end
   end
 
+  describe "encode_constraint/1" do
+    test "encodes every supported constraint shape, including fill" do
+      assert Layout.encode_constraint({:percentage, 50}) == %{
+               "type" => "percentage",
+               "value" => 50
+             }
+
+      assert Layout.encode_constraint({:length, 10}) == %{"type" => "length", "value" => 10}
+      assert Layout.encode_constraint({:min, 3}) == %{"type" => "min", "value" => 3}
+      assert Layout.encode_constraint({:max, 8}) == %{"type" => "max", "value" => 8}
+
+      assert Layout.encode_constraint({:ratio, 1, 3}) == %{
+               "type" => "ratio",
+               "num" => 1,
+               "den" => 3
+             }
+
+      assert Layout.encode_constraint({:fill, 2}) == %{"type" => "fill", "value" => 2}
+    end
+
+    test "raises a clear ArgumentError on an unrecognized shape" do
+      assert_raise ArgumentError, "invalid layout constraint: {:bogus, 1}", fn ->
+        Layout.encode_constraint({:bogus, 1})
+      end
+    end
+  end
+
   describe "split/4 with :flex" do
     test ":center pushes a fixed-length segment to the middle of the area" do
       area = %Rect{x: 0, y: 0, width: 30, height: 1}

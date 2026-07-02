@@ -11,8 +11,10 @@ defmodule ExRatatui.Widgets.Table do
     * `:header` - optional list of header cells (same shape as row cells)
     * `:footer` - optional list of footer cells (same shape as row cells).
       Renders at the bottom of the table area.
-    * `:widths` - list of constraint tuples for column widths
-      (e.g., `[{:length, 10}, {:percentage, 50}, {:min, 5}]`)
+    * `:widths` - list of column-width constraints, using the same shapes as
+      `ExRatatui.Layout` (`:length`, `:percentage`, `:min`, `:max`, `:ratio`,
+      `{:fill, weight}`). For example `[{:length, 10}, {:fill, 1}]` pins the
+      first column to 10 cells and lets the second grow to fill the rest.
     * `:style` - `%ExRatatui.Style{}` for the table
     * `:block` - optional `%ExRatatui.Widgets.Block{}` container
     * `:highlight_style` - `%ExRatatui.Style{}` for the selected row (row-level highlight)
