@@ -581,7 +581,10 @@ defmodule ExRatatui.Server do
 
   @doc false
   def handle_poll_result(nil, state), do: {:continue, state, false}
-  def handle_poll_result({:error, _}, state), do: {:continue, state, false}
+  def handle_poll_result({:error, reason}, state) do
+    Logger.error("ExRatatui.Server: Terminal poll error: #{inspect(reason)}. Stopping terminal server.")
+    {:stop, state}
+  end
   def handle_poll_result(event, state), do: dispatch_event(state, event)
 
   @doc false
