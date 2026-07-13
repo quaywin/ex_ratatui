@@ -458,8 +458,8 @@ defmodule ExRatatui.Server do
     # Update size on wake in case terminal size or layout changed
     {w, h} =
       case resolve_terminal_size(state.test_mode, state.terminal_size_fn) do
-        {w_sz, h_sz} -> {w_sz, h_sz}
         {:error, _} -> {state.width, state.height}
+        {w_sz, h_sz} -> {w_sz, h_sz}
       end
 
     # Set new references and size, then force a render redraw
