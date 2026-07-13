@@ -147,7 +147,7 @@ defmodule ExRatatui.Server do
           mouse_capture: mouse_capture?
         }
 
-        if not test_mode do
+        if is_nil(test_mode) do
           :os.set_signal(:sigcont, :handle)
           :gen_event.add_handler(:erl_signal_server, ExRatatui.SignalHandler, %{target: self()})
         end
@@ -554,7 +554,7 @@ defmodule ExRatatui.Server do
     cancel_subscription_timers(state)
     restore_terminal(state.terminal_ref)
     LocalInput.reattach(state.local_input)
-    if not state.test_mode do
+    if is_nil(state.test_mode) do
       :gen_event.delete_handler(:erl_signal_server, ExRatatui.SignalHandler, [])
     end
     state.mod.terminate(reason, state.user_state)
