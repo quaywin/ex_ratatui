@@ -42,7 +42,9 @@ defmodule ExRatatui.Server do
     transport: :local,
     poll_interval: 16,
     terminal_initialized: false,
-    local_input: :not_detached
+    local_input: :not_detached,
+    focus_events: false,
+    mouse_capture: false
   ]
 
   @subscription_message :__ex_ratatui_subscription_tick__
@@ -114,6 +116,8 @@ defmodule ExRatatui.Server do
     mod = Keyword.fetch!(opts, :mod)
     poll_interval = Keyword.get(opts, :poll_interval, 16)
     test_mode = Keyword.get(opts, :test_mode)
+    focus_events? = Keyword.get(opts, :focus_events, false)
+    mouse_capture? = Keyword.get(opts, :mouse_capture, false)
     # Internal test seam for deterministic live-mode renders without
     # changing production terminal-size behavior.
     terminal_size_fn = Keyword.get(opts, :terminal_size_fn, &ExRatatui.terminal_size/0)
@@ -138,8 +142,15 @@ defmodule ExRatatui.Server do
           runtime_mode: runtime_mode(mod),
           # Hand local input off to crossterm for the session; resumed in
           # terminate/2. See ExRatatui.LocalInput.
-          local_input: LocalInput.detach()
+          local_input: LocalInput.detach(),
+          focus_events: focus_events?,
+          mouse_capture: mouse_capture?
         }
+
+        if not test_mode do
+          :os.set_signal(:sigcont, :handle)
+          :gen_event.add_handler(:erl_signal_server, ExRatatui.SignalHandler, %{target: self()})
+        end
 
         # Mount-time probe — only honored on :local transport (other
         # transports either force halfblocks (CellSession) or surface
@@ -434,6 +445,37 @@ defmodule ExRatatui.Server do
   # never reach the user module's handle_info/2.
   def handle_info(:poll, state), do: {:noreply, state}
 
+  def handle_info(:sigcont, %__MODULE__{transport: :local} = state) do
+    # Re-detach input to make sure prim_tty is parked
+    LocalInput.reattach(state.local_input)
+    new_local_input = LocalInput.detach()
+
+    # Restore and re-initialize terminal raw mode and alternate screen
+    restore_terminal(state.terminal_ref)
+
+    new_terminal_ref = init_terminal(state.test_mode, state.focus_events, state.mouse_capture)
+
+    # Update size on wake in case terminal size or layout changed
+    {w, h} =
+      case resolve_terminal_size(state.test_mode, state.terminal_size_fn) do
+        {w_sz, h_sz} -> {w_sz, h_sz}
+        {:error, _} -> {state.width, state.height}
+      end
+
+    # Set new references and size, then force a render redraw
+    state = %{
+      state
+      | terminal_ref: new_terminal_ref,
+        local_input: new_local_input,
+        width: w,
+        height: h
+    }
+
+    state = do_render(state)
+
+    {:noreply, state}
+  end
+
   def handle_info({@subscription_message, id, token}, state) do
     dispatch_subscription_tick(id, token, state)
   end
@@ -512,6 +554,9 @@ defmodule ExRatatui.Server do
     cancel_subscription_timers(state)
     restore_terminal(state.terminal_ref)
     LocalInput.reattach(state.local_input)
+    if not state.test_mode do
+      :gen_event.delete_handler(:erl_signal_server, ExRatatui.SignalHandler, [])
+    end
     state.mod.terminate(reason, state.user_state)
     emit_transport_disconnect(state, reason)
     :ok
@@ -1211,5 +1256,34 @@ defmodule ExRatatui.Server do
       |> Enum.take(state.trace_limit)
 
     %{state | trace_events: trace_events}
+  end
+end
+
+defmodule ExRatatui.SignalHandler do
+  @behaviour :gen_event
+
+  def init(state) do
+    {:ok, state}
+  end
+
+  def handle_event(:sigcont, state) do
+    send(state.target, :sigcont)
+    {:ok, state}
+  end
+
+  def handle_event(_event, state) do
+    {:ok, state}
+  end
+
+  def handle_call(_request, state) do
+    {:ok, :ok, state}
+  end
+
+  def handle_info(_info, state) do
+    {:ok, state}
+  end
+
+  def terminate(_reason, _state) do
+    :ok
   end
 end
